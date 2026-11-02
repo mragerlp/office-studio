@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f3ed" />
+    <title>Office Studio</title>
+    <link rel="icon" href="/assets/ampersand.svg" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="studio-brand">
+        <button
+          type="button"
+          id="review-mark"
+          class="review-mark"
+          data-pending="0"
+          aria-label="Beyder &amp; Co. ampersand"
+          title="Beyder &amp; Co. ampersand"
+          disabled
+        >
+          <span class="brand-symbol" aria-hidden="true"></span>
+        </button>
+        <a class="wordmark" href="/" aria-label="Office Studio home"
+          >Office <strong>Studio</strong
+          ><span class="local-label">LOCAL OFFICE SUITES</span></a
+        >
+      </div>
+      <div class="office-switch">
+        <label for="workspace-select" class="sr-only"
+          >Current Office Suite</label
+        ><select id="workspace-select">
+          <option value="">Choose an Office Suite</option></select
+        ><button id="new-office" class="button quiet" type="button">
+          + New office
+        </button>
+      </div>
+    </header>
+    <main>
+      <div
+        id="notice"
+        role="status"
+        aria-live="polite"
+        class="notice"
+        hidden
+      ></div>
+      <section id="setup" class="setup" aria-labelledby="setup-title">
+        <div class="setup-intro">
+          <p class="eyebrow">OFFICE SETUP</p>
+          <h1 id="setup-title">Build your<br />office.</h1>
+          <p class="lede">
+            Choose a crew for your business. Give a desk a brief, then review
+            its draft in the boardroom.
+          </p>
+          <div class="principles">
+            <span>01 <b>Brand your office</b></span
+            ><span>02 <b>Meet your crew</b></span
+            ><span>03 <b>Review the work</b></span>
+          </div>
+          <div class="setup-note">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+              <strong>Start with a simulated draft.</strong>
+              <p>No connected systems or customer records are needed.</p>
+            </div>
+          </div>
+        </div>
+        <form id="office-form" class="paper setup-form">
+          <div class="section-label">
+            <span>THE FRONT DOOR</span><span>01 / SETUP</span>
+          </div>
+          <h2>Create your Office Suite</h2>
+          <p class="muted">A few details make this space yours.</p>
+          <label for="office-name">Office Suite name</label
+          ><input
+            id="office-name"
+            name="name"
+            maxlength="100"
+            placeholder="e.g. The Neighborhood Practice"
+            required
+            autocomplete="organization"
+          />
+          <label for="office-town"
+            >Town or service area <span class="optional">optional</span></label
+          ><input
+            id="office-town"
+            name="town"
+            maxlength="100"
+            placeholder="e.g. Your town · serving the local community"
+          />
+          <div class="form-row">
+            <div>
+              <label for="practice">Practice template</label
+              ><select id="practice" name="practice">
+                <option value="generic">General business / restaurant</option>
+                <option value="re">Real estate</option>
+                <option value="law">Law practice</option>
+                <option value="acct">Accounting</option>
+                <option value="fin">Financial advisory</option>
+                <option value="med">Medical practice</option>
+                <option value="research">Scientific research</option>
+                <option value="biotech">Biotech</option>
+              </select>
+            </div>
+            <div class="color-field">
+              <label for="office-color">Accent</label
+              ><input
+                id="office-color"
+                type="color"
+                value="#285b53"
+                name="color"
+              />
+            </div>
+          </div>
+          <div id="practice-label-field">
+            <label for="practice-label">Your industry or practice</label
+            ><input
+              id="practice-label"
+              maxlength="100"
+              value="General business"
+              placeholder="e.g. Restaurant, architecture, consulting"
+              required
+            />
+          </div>
+          <div class="logo-field">
+            <div>
+              <label for="office-logo"
+                >Your logo <span class="optional">optional</span></label
+              ><input
+                id="office-logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+              />
+              <p class="field-note">PNG, JPEG or WebP · up to 200 KB</p>
+            </div>
+            <img
+              id="logo-preview"
+              alt="Your selected office logo"
+              hidden
+            /><button id="clear-logo" type="button" class="text-button" hidden>
+              Remove
+            </button>
+          </div>
+          <div
+            id="template-preview"
+            class="template-preview"
+            aria-live="polite"
+          ></div>
+          <p class="field-note">
+            The setup count includes a dedicated LEGAL desk. The limit is 10
+            desks in total. Existing offices are unchanged.
+          </p>
+          <details class="import-details">
+            <summary>Already have an intake JSON?</summary>
+            <label for="import-pack">Import a practice pack</label
+            ><input
+              id="import-pack"
+              type="file"
+              accept="application/json,.json"
+            />
+            <p class="field-note">
+              Use a synthetic pack. Keep personal and customer information out.
+            </p>
+          </details>
+          <button id="create-office" class="button primary full" type="submit">
+            Create office <span aria-hidden="true">↗</span>
+          </button>
+          <p class="field-note center">
+            Saved on this local host. No action is sent to an outside system.
+          </p>
+        </form>
+      </section>
+      <section id="workspace" hidden aria-labelledby="workspace-title">
+        <div class="workspace-heading">
+          <div class="office-identity">
+            <img id="workspace-logo" alt="" hidden />
+            <div>
+              <p class="eyebrow">YOUR OFFICE SUITE</p>
+              <h1 id="workspace-title"></h1>
+              <p id="workspace-town" class="muted"></p>
+              <a
+                id="town-map"
+                class="map-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerpolicy="no-referrer"
+                hidden
+                >Find town on map ↗</a
+              >
+              <p id="map-note" class="map-note" hidden>
+                Opens a town/service-area search on OpenStreetMap; no exact
+                location is pinned.
+              </p>
+              <a
+                id="manual-open"
+                class="manual-open"
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerpolicy="no-referrer"
+                hidden
+                >Company operating manual ↗</a
+              >
+            </div>
+          </div>
+          <div class="safety-badge">
+            <span class="status-dot" aria-hidden="true"></span>Drafts first.
+            Decisions stay yours.
+          </div>
+        </div>
+        <div class="workspace-views" aria-label="Office views">
+          <div class="view-buttons">
+            <button
+              id="view-room"
+              class="button quiet"
+              type="button"
+              aria-pressed="false"
+              aria-controls="room-stage"
+              disabled
+            >
+              3D office</button
+            ><button
+              id="view-desks"
+              class="button quiet"
+              type="button"
+              aria-pressed="true"
+              aria-controls="desk-workspace"
+            >
+              Desks &amp; drafts
+            </button>
+          </div>
+          <p id="room-availability" class="field-note" role="status">
+            Checking the optional local 3D room…
+          </p>
+        </div>
+        <section
+          id="room-stage"
+          class="paper room-stage"
+          aria-labelledby="room-title"
+          hidden
+        >
+          <div class="room-toolbar">
+            <div>
+              <p class="eyebrow">YOUR OFFICE · PRIVATE LOCAL VIEW</p>
+              <h2 id="room-title">Inside your office</h2>
+            </div>
+            <a
+              id="room-full-tab"
+              class="button quiet"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+              >Open room in full tab ↗</a
+            >
+          </div>
+          <div id="room-frames" class="room-frames"></div>
+          <p id="room-disclosure" class="room-disclosure">
+            Room activity is simulated. Use Desks &amp; drafts for saved drafts
+            and Studio decisions; actions inside this room do not record Studio
+            approvals.
+          </p>
+        </section>
+        <div id="desk-workspace" class="workspace-grid">
+          <section class="paper office-room" aria-labelledby="crew-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">THE FLOOR</p>
+                <h2 id="crew-title">A desk for every lane</h2>
+              </div>
+              <span id="crew-count" class="count-label"></span>
+            </div>
+            <p class="muted room-description">
+              Choose a desk to prepare work with that agent.
+            </p>
+            <div class="room">
+              <div class="room-window" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </div>
+              <div id="desks" class="desks"></div>
+              <button id="boardroom" class="boardroom" type="button">
+                <span class="table-dots" aria-hidden="true"
+                  >● &nbsp; ● &nbsp; ●</span
+                ><strong>The review table</strong
+                ><span id="table-count">Your decisions come here</span
+                ><span class="table-dots" aria-hidden="true"
+                  >● &nbsp; ● &nbsp; ●</span
+                >
+              </button>
+              <div class="room-caption">
+                <span aria-hidden="true">◈</span> A workspace view · no live
+                connections implied
+              </div>
+            </div>
+            <button
+              id="show-add-agent"
+              class="button quiet add-agent-button"
+              type="button"
+            >
+              + Add a desk
+            </button>
+            <form id="add-agent-form" class="add-agent-form" hidden>
+              <h3>A new seat at the table</h3>
+              <label for="agent-name">Agent name</label
+              ><input
+                id="agent-name"
+                maxlength="14"
+                required
+                placeholder="e.g. EDITOR"
+              /><label for="agent-specialty">Specialty</label
+              ><input
+                id="agent-specialty"
+                maxlength="100"
+                required
+                placeholder="e.g. Content drafts"
+              /><label for="agent-instruction">Lane instructions</label
+              ><textarea
+                id="agent-instruction"
+                maxlength="3000"
+                rows="3"
+                required
+                placeholder="What should this agent prepare for your review?"
+              ></textarea>
+              <div class="button-row">
+                <button class="button primary" type="submit">Add agent</button
+                ><button
+                  id="cancel-add-agent"
+                  class="button quiet"
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+            <details class="house-rules">
+              <summary>Office rules & approval gates</summary>
+              <p id="office-rules"></p>
+              <ul id="office-gates"></ul>
+              <details class="manual-settings">
+                <summary>
+                  Company operating manual
+                  <span class="optional">optional</span>
+                </summary>
+                <form id="manual-form">
+                  <label for="manual-url">Manual URL</label>
+                  <input
+                    id="manual-url"
+                    type="url"
+                    maxlength="2048"
+                    placeholder="https://example.com/your-operating-manual"
+                    autocomplete="off"
+                    aria-describedby="manual-note"
+                  />
+                  <p id="manual-note" class="field-note">
+                    Use an HTTPS link without a username or password. It opens
+                    only when clicked; this app does not fetch, embed, or send
+                    the manual to a model. Leave blank to remove it.
+                  </p>
+                  <button id="save-manual" class="button quiet" type="submit">
+                    Save manual link
+                  </button>
+                </form>
+              </details>
+            </details>
+          </section>
+          <div class="work-column">
+            <section class="paper draft-panel" aria-labelledby="draft-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">DRAFTING</p>
+                  <h2 id="draft-title">Give a desk a brief</h2>
+                </div>
+                <span aria-hidden="true" class="panel-icon">↗</span>
+              </div>
+              <form id="draft-form">
+                <label for="draft-agent">Prepare with</label
+                ><select id="draft-agent" required></select>
+                <p id="agent-description" class="field-note"></p>
+                <details id="desk-settings" class="desk-settings">
+                  <summary>
+                    Desk settings <span id="saved-route-label"></span>
+                  </summary>
+                  <p id="route-agent" class="field-note"></p>
+                  <div class="appearance-settings">
+                    <label for="appearance-title"
+                      >Display title
+                      <span class="optional">optional</span></label
+                    >
+                    <input
+                      id="appearance-title"
+                      type="text"
+                      maxlength="100"
+                      placeholder="Use the desk’s default title"
+                    />
+                    <label for="appearance-color">Desk color</label>
+                    <div class="appearance-color-row">
+                      <input
+                        id="appearance-color"
+                        type="color"
+                        value="#285b53"
+                      /><label
+                        class="inline-check"
+                        for="appearance-default-color"
+                        ><input
+                          id="appearance-default-color"
+                          type="checkbox"
+                          checked
+                        />Use default color</label
+                      >
+                    </div>
+                    <p id="appearance-default-note" class="field-note"></p>
+                    <div class="button-row">
+                      <button
+                        id="save-appearance"
+                        class="button quiet"
+                        type="button"
+                      >
+                        Save appearance</button
+                      ><button
+                        id="reset-appearance"
+                        class="button quiet"
+                        type="button"
+                      >
+                        Reset defaults
+                      </button>
+                    </div>
+                    <p class="field-note">
+                      Titles and colors change the display. The agent’s stable
+                      name, provider route and draft ownership stay the same.
+                    </p>
+                  </div>
+                  <label for="route-provider">Preferred provider</label>
+                  <select id="route-provider"></select>
+                  <label for="route-model">Preferred model</label>
+                  <select id="route-model"></select>
+                  <p id="route-status" class="field-note" role="status"></p>
+                  <button id="save-route" class="button quiet" type="button">
+                    Save route
+                  </button>
+                  <p class="field-note">
+                    Configuration is not a successful sign-in. Consumer account
+                    sign-in is unavailable in this app.
+                  </p>
+                </details>
+                <label for="draft-brief">What would you like to work on?</label
+                ><textarea
+                  id="draft-brief"
+                  rows="4"
+                  maxlength="8000"
+                  required
+                  placeholder="Try: Draft a friendly opening-hours announcement for owner review. Use placeholders only."
+                ></textarea
+                ><label for="draft-provider">For this draft</label
+                ><select id="draft-provider" required></select>
+                <p id="provider-note" class="field-note"></p>
+                <button
+                  id="generate-draft"
+                  class="button primary full"
+                  type="submit"
+                >
+                  Prepare draft <span aria-hidden="true">↗</span>
+                </button>
+              </form>
+              <p class="draft-disclosure">
+                Use synthetic briefs. Drafts are working text; review them
+                before use.
+              </p>
+              <details class="provider-setup">
+                <summary>Configure providers on this desktop</summary>
+                <p>
+                  Local demo works immediately. Use the
+                  <strong>Configure Providers</strong> launcher to open the
+                  terminal setup wizard, then restart the local server. Keys
+                  belong in that setup flow, never in briefs or this browser.
+                </p>
+                <p>Provider documentation and advanced environment settings:</p>
+                <ul>
+                  <li>
+                    <a
+                      href="https://platform.openai.com/docs/quickstart"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >OpenAI</a
+                    >: <code>OPENAI_API_KEY</code> +
+                    <code>OFFICE_OPENAI_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://docs.anthropic.com/en/api/getting-started"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Claude</a
+                    >: <code>ANTHROPIC_API_KEY</code> +
+                    <code>OFFICE_ANTHROPIC_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://ai.google.dev/gemini-api/docs/api-key"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Gemini</a
+                    >: <code>GEMINI_API_KEY</code> +
+                    <code>OFFICE_GEMINI_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://dev.meta.ai/docs/overview"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Meta Muse</a
+                    >: <code>MODEL_API_KEY</code> +
+                    <code>OFFICE_META_MODEL</code>
+                  </li>
+                </ul>
+                <p>
+                  Optional <code>OFFICE_OPENAI_MODELS</code>,
+                  <code>OFFICE_ANTHROPIC_MODELS</code>,
+                  <code>OFFICE_GEMINI_MODELS</code>, or
+                  <code>OFFICE_META_MODELS</code> adds comma-separated allowed
+                  models. Host configuration does not verify provider access.
+                  Consumer account sign-in is unavailable here.
+                </p>
+              </details>
+            </section>
+            <section
+              id="review-panel"
+              class="paper review-panel"
+              aria-labelledby="review-title"
+              tabindex="-1"
+            >
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">THE OWNER'S CHAIR</p>
+                  <h2 id="review-title">Approval inbox</h2>
+                </div>
+                <span id="pending-count" class="number-badge">0</span>
+              </div>
+              <p class="muted review-description">
+                Approval records your decision. It does not send, publish, book,
+                or execute anything.
+              </p>
+              <div id="draft-list" class="draft-list"></div>
+              <article id="draft-preview" class="draft-preview" hidden>
+                <div class="preview-heading">
+                  <span id="preview-status" class="state-pill"></span
+                  ><span id="preview-provider" class="field-note"></span>
+                </div>
+                <h3 id="preview-brief"></h3>
+                <p id="preview-agent" class="field-note"></p>
+                <pre id="preview-text"></pre>
+                <div id="decision-buttons" class="button-row">
+                  <button
+                    id="approve-draft"
+                    class="button primary"
+                    type="button"
+                  >
+                    Record approval</button
+                  ><button
+                    id="decline-draft"
+                    class="button quiet"
+                    type="button"
+                  >
+                    Decline draft
+                  </button>
+                </div>
+                <p id="decision-note" class="field-note"></p>
+              </article>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+    <dialog
+      id="field-manual"
+      class="paper manual-dialog"
+      aria-labelledby="field-manual-title"
+    >
+      <p class="eyebrow">THE FIELD</p>
+      <h2 id="field-manual-title">Office reference</h2>
+      <p class="field-note" id="field-manual-note"></p>
+      <div class="button-row">
+        <a
+          id="field-manual-link"
+          class="button primary"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+          >Company manual ↗</a
+        >
+        <a
+          class="button quiet"
+          href="/help.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Offline app guide ↗</a
+        >
+        <button class="button quiet" type="button" id="close-field-manual">
+          Back to room
+        </button>
+      </div>
+    </dialog>
+    <footer>
+      <span
+        >Office Studio
+        <small>· <a id="company-credit" href="https://www.beyderco.com/" target="_blank" rel="noopener noreferrer" aria-label="Beyder &amp; Co. company website (opens in a new tab)">Beyder &amp; Co.</a></small></span
+      >
+      <p>Workspaces and decisions are saved on this computer.</p>
+      <div class="footer-tools">
+        <span>LOCAL EDITION / 01</span>
+        <a id="help-link" href="https://manual.beyderco.com/" target="_blank" rel="noopener noreferrer" aria-label="Help — Beyder &amp; Co. knowledge base (opens in a new tab)">Help ↗</a>
+      </div>
+    </footer>
+  </body>
+</html>

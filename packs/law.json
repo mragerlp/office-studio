@@ -1,0 +1,168 @@
+{
+  "office": "Law office · Agent Office",
+  "practice": "Law practice",
+  "about": "Synthetic general business law practice; demonstration only, no real matters.",
+  "people": "2 attorneys and 1 paralegal (synthetic)",
+  "hoursPerWeek": 10,
+  "feed": "simulated",
+  "privacy": "Regulated by law",
+  "systems": [
+    "Clio",
+    "Outlook",
+    "Calendar"
+  ],
+  "answers": {
+    "Main practice area": "General business (synthetic)",
+    "Practice size": "2–5 attorneys"
+  },
+  "crew": [
+    {
+      "name": "CRIMSON",
+      "specialty": "Chief of Staff",
+      "engine": "Claude",
+      "color": "crimson",
+      "style": "headset",
+      "systems": [
+        "Crew coordination",
+        "Durable memory",
+        "Goals & schedule",
+        "Approval gates"
+      ],
+      "instruction": "Run the law office: assign work across the lanes, keep memory and the schedule, and bring every gate to the owner prepared to one step (Any legal advice or opinion: attorney only; Anything sent to a client; Anything filed with a court; Any engagement letter; Any invoice). Agents never give legal advice. An attorney signs off on anything sent or filed. Client confidences stay inside your own systems."
+    },
+    {
+      "name": "INTAKE",
+      "specialty": "Client Intake",
+      "engine": "Claude",
+      "color": "azure",
+      "style": "headset",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Collects the facts and prepares the conflict check for an attorney. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "DRAFTER",
+      "specialty": "Documents",
+      "engine": "Claude",
+      "color": "violet",
+      "style": "hoodie",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "First drafts from your own templates, marked for attorney review. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "DOCKET",
+      "specialty": "Deadlines & Calendar",
+      "engine": "Claude",
+      "color": "teal",
+      "style": "blazer",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Calendars every date and warns you early. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "TIMEKEEPER",
+      "specialty": "Time Capture",
+      "engine": "Claude",
+      "color": "orange",
+      "style": "robot",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Turns emails and calls into draft time entries. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "CLIENT DESK",
+      "specialty": "Client Updates",
+      "engine": "Claude",
+      "color": "plum",
+      "style": "press",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Drafts plain-language status notes for you to send. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "BILLING",
+      "specialty": "Billing",
+      "engine": "Claude",
+      "color": "green",
+      "style": "vest",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Prepares invoices and polite reminders. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "SCOUT",
+      "specialty": "Visibility",
+      "engine": "Claude",
+      "color": "lime",
+      "style": "field",
+      "systems": [
+        "Clio",
+        "Outlook",
+        "Calendar"
+      ],
+      "instruction": "Keeps profiles current and asks happy clients for reviews. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    }
+  ],
+  "gates": [
+    {
+      "owner": "CRIMSON",
+      "need": "Any legal advice or opinion: attorney only",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Anything sent to a client",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Anything filed with a court",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any engagement letter",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any invoice",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    }
+  ],
+  "rules": "Agents never give legal advice. An attorney signs off on anything sent or filed. Client confidences stay inside your own systems."
+}

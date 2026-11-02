@@ -1,0 +1,56 @@
+name: Check Office Studio
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            python: '3.10'
+            architecture: x64
+            target: windows-x64
+            executable: office-studio-runner.exe
+          - os: macos-15
+            python: '3.14'
+            architecture: arm64
+            target: macos-arm64
+            executable: office-studio-runner
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+          architecture: ${{ matrix.architecture }}
+      - name: Test the local API and provider contracts
+        run: python -B -m unittest -v
+      - name: Install the pinned native packager
+        run: python -m pip install --disable-pip-version-check PyInstaller==6.22.3
+      - name: Freeze the native launcher on its own architecture
+        run: python -B build_runner.py build --target ${{ matrix.target }} --output dist/native
+      - name: Build the public portable ZIP without private room HTML
+        run: python -B package.py --runner dist/native/${{ matrix.executable }} --output dist/office-studio-${{ matrix.target }}.zip
+      - name: Check the ZIP
+        run: python -m zipfile -t dist/office-studio-${{ matrix.target }}.zip
+      - name: Smoke-test the real frozen runner extracted from the public ZIP
+        run: python -B build_runner.py smoke --target ${{ matrix.target }} --archive dist/office-studio-${{ matrix.target }}.zip
+      - name: Attach the native portable ZIP directly
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: office-studio-${{ matrix.target }}
+          path: dist/office-studio-${{ matrix.target }}.zip
+          archive: false
+          if-no-files-found: error

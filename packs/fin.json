@@ -1,0 +1,162 @@
+{
+  "office": "Advisory office · Agent Office",
+  "practice": "Financial advisory",
+  "about": "Synthetic financial advisory practice; demonstration only, no real accounts.",
+  "people": "1 advisor and 2 staff (synthetic)",
+  "hoursPerWeek": 8,
+  "feed": "simulated",
+  "privacy": "Regulated by law",
+  "systems": [
+    "Redtail",
+    "eMoney",
+    "Orion",
+    "Calendar"
+  ],
+  "answers": {
+    "Firm type": "RIA",
+    "Does compliance pre-approve messages?": "Yes"
+  },
+  "crew": [
+    {
+      "name": "CRIMSON",
+      "specialty": "Chief of Staff",
+      "engine": "Claude",
+      "color": "crimson",
+      "style": "headset",
+      "systems": [
+        "Crew coordination",
+        "Durable memory",
+        "Goals & schedule",
+        "Approval gates"
+      ],
+      "instruction": "Run the advisory office: assign work across the lanes, keep memory and the schedule, and bring every gate to the owner prepared to one step (Any investment recommendation: advisor only; Any client message; Anything mentioning performance; Account paperwork; Any social post). The advisor approves every message, from compliance-approved templates. No performance promises. Every communication is kept for your records."
+    },
+    {
+      "name": "PREP",
+      "specialty": "Meeting Prep",
+      "engine": "Claude",
+      "color": "teal",
+      "style": "blazer",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Builds the agenda and talking points before each meeting. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "NOTETAKER",
+      "specialty": "Notes & Tasks",
+      "engine": "Claude",
+      "color": "azure",
+      "style": "headset",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Turns each meeting into tasks and a draft follow-up. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "PAPERWORK",
+      "specialty": "Account Paperwork",
+      "engine": "Claude",
+      "color": "indigo",
+      "style": "vest",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Tracks forms and signatures still missing. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "REPORTS",
+      "specialty": "Client Reports",
+      "engine": "Claude",
+      "color": "green",
+      "style": "vest",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Drafts the review package from your data. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "CHECK-INS",
+      "specialty": "Client Check-ins",
+      "engine": "Claude",
+      "color": "plum",
+      "style": "press",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Drafts compliant check-in notes from approved templates. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "CALENDAR",
+      "specialty": "Scheduling",
+      "engine": "Claude",
+      "color": "orange",
+      "style": "robot",
+      "systems": [
+        "Redtail",
+        "eMoney",
+        "Orion",
+        "Calendar"
+      ],
+      "instruction": "Offers times and confirms meetings. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    }
+  ],
+  "gates": [
+    {
+      "owner": "CRIMSON",
+      "need": "Any investment recommendation: advisor only",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any client message",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Anything mentioning performance",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Account paperwork",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any social post",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    }
+  ],
+  "rules": "The advisor approves every message, from compliance-approved templates. No performance promises. Every communication is kept for your records."
+}
