@@ -23,6 +23,8 @@ With the owner's compatible room installed, **Create office** opens the tower in
 
 </details>
 
+The [Office Suite media kit](https://github.com/mragerlp/office-studio/tree/develop/media/instagram) includes the logo, Instagram artwork, and a short film of an office being created in the app.
+
 ## Start locally
 
 **Using a packaged build:** Extract the complete ZIP for your operating system. Double-click **Start Office Studio.command** on an Apple Silicon Mac or **Start Office Studio.cmd** on Windows x64. The launcher starts the server and opens setup in your default browser. Keep its terminal window open while you work. The platform builds include their own runtime.
