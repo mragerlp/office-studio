@@ -22,6 +22,9 @@ const state = {
   deskKey: "",
   busy: false,
   template: null,
+  templatePreview: null,
+  templateMessage: "",
+  legalTemplateRequest: null,
   templateEpoch: 0,
   logo: "",
   rooms: new Map(),
@@ -306,6 +309,10 @@ function applyAccent(value) {
     .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
   document.documentElement.style.setProperty(
+    "--amp-surface",
+    luminance > 0.58 ? "#304138" : "transparent",
+  );
+  document.documentElement.style.setProperty(
     "--accent-ink",
     luminance > 0.18 ? "#17281f" : "#ffffff",
   );
@@ -365,11 +372,22 @@ function registerWorkspace(workspace) {
 function renderTemplate() {
   const box = $("template-preview");
   box.replaceChildren();
-  const pack = state.template;
+  const pack = state.template || state.templatePreview;
   if (!pack) {
     box.append(
-      el("strong", "", "Loading the template…"),
-      el("p", "", "Preparing the crew and approval gates."),
+      el(
+        "strong",
+        "",
+        state.templateMessage
+          ? "Template unavailable"
+          : "Loading the template…",
+      ),
+      el(
+        "p",
+        "",
+        state.templateMessage ||
+          "Preparing the crew, dedicated LEGAL desk and approval gates.",
+      ),
     );
     return;
   }
@@ -377,10 +395,72 @@ function renderTemplate() {
     el(
       "strong",
       "",
-      `${pack.crew.length} desks · ${pack.gates.length} approval gate${pack.gates.length === 1 ? "" : "s"}`,
+      state.templateMessage
+        ? pack.crew.length + " supplied desks · LEGAL needs one free seat"
+        : pack.crew.length +
+            " desks · LEGAL included · " +
+            pack.gates.length +
+            " approval gate" +
+            (pack.gates.length === 1 ? "" : "s"),
     ),
-    el("p", "", pack.crew.map((a) => a.name).join(" / ")),
+    el("p", "", pack.crew.map((agent) => agent.name).join(" / ")),
   );
+  if (state.templateMessage) box.append(el("p", "", state.templateMessage));
+}
+function templateFailure(error) {
+  state.template = null;
+  state.templatePreview = error.preview || null;
+  state.templateMessage =
+    error instanceof SyntaxError
+      ? "This file is not valid JSON."
+      : error.message;
+  renderTemplate();
+  notice(state.templateMessage, true);
+}
+async function legalDeskTemplate() {
+  if (!state.legalTemplateRequest) {
+    state.legalTemplateRequest = api("/api/templates/legal")
+      .then((source) => {
+        const agent = {};
+        for (const key of [
+          "name",
+          "specialty",
+          "engine",
+          "color",
+          "style",
+          "systems",
+          "instruction",
+        ]) {
+          if (Object.prototype.hasOwnProperty.call(source, key))
+            agent[key] = structuredClone(source[key]);
+        }
+        checkedPack({ crew: [agent], gates: [], rules: "" });
+        if (agent.name !== "LEGAL")
+          throw new Error(
+            "The local server did not provide its LEGAL desk template. Restart the updated server and try again.",
+          );
+        return agent;
+      })
+      .catch((error) => {
+        state.legalTemplateRequest = null;
+        throw error;
+      });
+  }
+  return state.legalTemplateRequest;
+}
+async function prepareSetupPack(source) {
+  const pack = checkedPack(source);
+  if (pack.crew.some((agent) => agent.name.trim().toLowerCase() === "legal"))
+    return pack;
+  if (pack.crew.length >= 10) {
+    const error = new Error(
+      "The 10-desk limit includes LEGAL. Remove one desk from your imported JSON and import it again, or choose another template. No desks were removed automatically.",
+    );
+    error.preview = pack;
+    throw error;
+  }
+  const legal = await legalDeskTemplate();
+  return { ...pack, crew: [...pack.crew, structuredClone(legal)] };
 }
 function checkedPack(pack) {
   if (
@@ -404,12 +484,12 @@ function checkedPack(pack) {
       agent.name.length > 14 ||
       typeof agent.specialty !== "string" ||
       typeof agent.instruction !== "string" ||
-      seen.has(agent.name)
+      seen.has(agent.name.trim().toLowerCase())
     )
       throw new Error(
         "Each agent needs a unique name (up to 14 characters), specialty, and instruction.",
       );
-    seen.add(agent.name);
+    seen.add(agent.name.trim().toLowerCase());
   }
   for (const gate of pack.gates) {
     if (
@@ -424,6 +504,8 @@ function checkedPack(pack) {
 async function loadTemplate() {
   const epoch = ++state.templateEpoch;
   state.template = null;
+  state.templatePreview = null;
+  state.templateMessage = "";
   $("create-office").disabled = true;
   renderTemplate();
   try {
@@ -432,18 +514,13 @@ async function loadTemplate() {
       ? structuredClone(localTemplates[key])
       : await api(`/packs/${encodeURIComponent(key)}.json`);
     if (epoch !== state.templateEpoch) return;
-    state.template = checkedPack(pack);
+    const prepared = await prepareSetupPack(pack);
+    if (epoch !== state.templateEpoch) return;
+    state.template = prepared;
     renderTemplate();
   } catch (error) {
     if (epoch !== state.templateEpoch) return;
-    notice(error.message, true);
-    $("template-preview").replaceChildren(
-      el(
-        "p",
-        "",
-        "Template unavailable. Choose another template or import a pack.",
-      ),
-    );
+    templateFailure(error);
   } finally {
     if (epoch === state.templateEpoch)
       $("create-office").disabled = !state.template;
@@ -460,6 +537,7 @@ function showSetup() {
   ++state.epoch;
   state.selectedId = "";
   state.workspace = null;
+  updateReviewMark(0);
   setBusy(false);
   renderSelector();
   $("setup").hidden = false;
@@ -478,6 +556,7 @@ async function selectWorkspace(id) {
   resetWorkspaceForms();
   state.selectedId = id;
   state.workspace = null;
+  updateReviewMark(0);
   state.draftId = "";
   setBusy(false);
   renderSelector();
@@ -756,6 +835,7 @@ function ensureRoomFrame(entry, workspace, reload) {
     );
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("allow", "screen-wake-lock");
+    frame.addEventListener("load", syncRoomReviewSignal);
     frame.setAttribute("aria-describedby", "room-disclosure");
     frame.addEventListener("error", () => {
       const current = state.rooms.get(state.roomFrameId);
@@ -905,6 +985,36 @@ function renderWorkspace() {
   renderManual(workspace);
   syncOfficeRoom();
 }
+function syncRoomReviewSignal() {
+  const frame = state.roomFrame,
+    office = state.workspace;
+  if (
+    !office ||
+    state.roomFrameId !== office.id ||
+    !frame?.contentWindow ||
+    !localRoomURL(frame.src)
+  )
+    return;
+  const pending = office.drafts.some((d) => d.status === "pending");
+  frame.contentWindow.postMessage(
+    { type: "office-studio:review-signal", pending },
+    new URL(frame.src).origin,
+  );
+}
+
+function updateReviewMark(pending) {
+  const mark = $("review-mark");
+  mark.disabled = !state.workspace;
+  mark.dataset.pending = String(pending);
+  mark.dataset.active = String(pending > 0);
+  const label = !state.workspace
+    ? "Beyder & Co. ampersand"
+    : `Beyder & Co. · Open approval inbox · ${pending} pending draft${pending === 1 ? "" : "s"}`;
+  mark.setAttribute("aria-label", label);
+  mark.title = label;
+  syncRoomReviewSignal();
+}
+
 function renderDrafts() {
   const drafts = state.workspace?.drafts || [];
   if (!drafts.some((d) => d.id === state.draftId))
@@ -913,6 +1023,7 @@ function renderDrafts() {
       drafts.at(-1)?.id ||
       "";
   const pending = drafts.filter((d) => d.status === "pending").length;
+  updateReviewMark(pending);
   $("pending-count").textContent = String(pending);
   $("table-count").textContent = pending
     ? `${pending} draft${pending === 1 ? "" : "s"} waiting for you`
@@ -997,9 +1108,16 @@ $("view-room").addEventListener("click", () => chooseOfficeView("room"));
 $("view-desks").addEventListener("click", () => chooseOfficeView("desks"));
 window.addEventListener("message", (event) => {
   const frame = state.roomFrame;
-  if (!frame || !state.workspace || state.roomFrameId !== state.workspace.id ||
-      event.source !== frame.contentWindow || !localRoomURL(frame.src) ||
-      event.origin !== new URL(frame.src).origin || event.data?.type !== "office-studio:open-manual") return;
+  if (
+    !frame ||
+    !state.workspace ||
+    state.roomFrameId !== state.workspace.id ||
+    event.source !== frame.contentWindow ||
+    !localRoomURL(frame.src) ||
+    event.origin !== new URL(frame.src).origin ||
+    event.data?.type !== "office-studio:open-manual"
+  )
+    return;
   const url = manualURL(state.workspace.manualUrl || "");
   const link = $("field-manual-link");
   link.hidden = !url;
@@ -1010,7 +1128,9 @@ window.addEventListener("message", (event) => {
     : "You can save this company's manual under Desks & drafts → Office rules & approval gates.";
   if (!$("field-manual").open) $("field-manual").showModal();
 });
-$("close-field-manual").addEventListener("click", () => $("field-manual").close());
+$("close-field-manual").addEventListener("click", () =>
+  $("field-manual").close(),
+);
 $("manual-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const url = manualURL($("manual-url").value);
@@ -1085,11 +1205,15 @@ $("import-pack").addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const epoch = ++state.templateEpoch;
+  state.template = null;
+  state.templatePreview = null;
+  state.templateMessage = "";
   $("create-office").disabled = true;
+  renderTemplate();
   try {
     if (file.size > 500 * 1024)
       throw new Error("Keep intake JSON below 500 KB.");
-    const pack = checkedPack(JSON.parse(await file.text()));
+    const pack = await prepareSetupPack(JSON.parse(await file.text()));
     if (epoch !== state.templateEpoch) return;
     state.template = pack;
     $("practice").value = "generic";
@@ -1100,16 +1224,7 @@ $("import-pack").addEventListener("change", async (event) => {
       "Intake crew, gates and rules imported. Keep all demonstration information synthetic.",
     );
   } catch (error) {
-    if (epoch === state.templateEpoch) {
-      state.template = null;
-      renderTemplate();
-      notice(
-        error instanceof SyntaxError
-          ? "This file is not valid JSON."
-          : error.message,
-        true,
-      );
-    }
+    if (epoch === state.templateEpoch) templateFailure(error);
   } finally {
     if (epoch === state.templateEpoch)
       $("create-office").disabled = !state.template;
@@ -1241,6 +1356,10 @@ $("draft-form").addEventListener("submit", (event) => {
       );
     },
   );
+});
+$("review-mark").addEventListener("click", () => {
+  chooseOfficeView("desks");
+  $("boardroom").click();
 });
 $("boardroom").addEventListener("click", () => {
   $("review-panel").scrollIntoView({

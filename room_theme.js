@@ -13,7 +13,26 @@
   const suppliedAgents = new Map(presentation.agents.filter(item => item && typeof item.agent === "string" &&
     typeof item.title === "string").map(item => [item.agent, item]));
   const knownIds = new Map();
-  let office, attempts = 0, queued = false;
+  let office, attempts = 0, queued = false, ownerReviewPending = false, reviewSculpture = null;
+
+  function markReviewSignal() {
+    if (!reviewSculpture) return;
+    reviewSculpture.group.userData.officeStudioReviewPending = ownerReviewPending;
+    document.documentElement.dataset.officeReviewPending = String(ownerReviewPending);
+  }
+
+  // Only a boolean from this frame's exact Studio parent is accepted. It is
+  // independent of native simulated gates and carries no draft or agent data.
+  if (window.parent !== window && typeof window.addEventListener === "function") {
+    window.addEventListener("message", event => {
+      const data = event.data;
+      if (event.source !== window.parent || event.origin !== presentation.studioOrigin ||
+          !data || typeof data !== "object" || Array.isArray(data) || Object.keys(data).length !== 2 ||
+          data.type !== "office-studio:review-signal" || typeof data.pending !== "boolean") return;
+      ownerReviewPending = data.pending;
+      markReviewSignal();
+    });
+  }
 
   function preparePaint(person) {
     if (!person || !person.look || typeof AGENT_COLORS !== "object") return null;
@@ -105,6 +124,47 @@
     if (!queued) { queued = true; requestAnimationFrame(decorate); }
   }
 
+  function tintExistingAmpersand() {
+    const sculpture = office.ROOM_OBJ && office.ROOM_OBJ.sculpture;
+    if (!sculpture || !sculpture.group || !sculpture.base || !safeColor(presentation.color) ||
+        !office.THREE || typeof office.THREE.Color !== "function") return;
+    const base = sculpture.base;
+    const sum = base.r + base.g + base.b;
+    if (!(sum > 0) || typeof base.copy !== "function") return;
+    const tint = new office.THREE.Color(presentation.color).convertSRGBToLinear();
+    // Retint the existing dedicated sculpture materials, preserving their
+    // relative brightness. The native frame loop still owns every pulse,
+    // opacity and emissive intensity; no geometry or extra mark is created.
+    for (const name of ["lacquer", "haloMat", "topMat", "poolMat", "revealMat"]) {
+      const material = sculpture[name];
+      if (!material) continue;
+      for (const property of name === "lacquer" ? ["color", "emissive"] : ["color"]) {
+        const color = material[property];
+        if (!color || typeof color.copy !== "function" || typeof color.multiplyScalar !== "function") continue;
+        const gain = (color.r + color.g + color.b) / sum;
+        if (Number.isFinite(gain) && gain >= 0) color.copy(tint).multiplyScalar(gain);
+      }
+    }
+    base.copy(tint);
+    sculpture.group.userData.officeStudioAmpColor = presentation.color;
+    // The native loop remains the sole clock, including reduced-motion rules.
+    // Its writes retain the realIssues result; only reads combine that result
+    // with the parent's saved-review boolean, without inventing room gates.
+    const fast = Object.getOwnPropertyDescriptor(sculpture, "fast");
+    if (!fast || fast.configurable) {
+      let nativeFast = Boolean(sculpture.fast);
+      sculpture.group.userData.officeStudioNativeFast = nativeFast;
+      Object.defineProperty(sculpture, "fast", {configurable: true, enumerable: true,
+        get: () => nativeFast || ownerReviewPending,
+        set: value => { nativeFast = Boolean(value); sculpture.group.userData.officeStudioNativeFast = nativeFast; }});
+      reviewSculpture = sculpture;
+      markReviewSignal();
+    }
+    sculpture.group.userData.officeStudioAmpSource = "native-real-issues-or-owner-review";
+    document.documentElement.dataset.officeAmpColor = presentation.color;
+    document.documentElement.dataset.officeAmpSource = "native-real-issues-or-owner-review";
+  }
+
   function start() {
     office = window.__office;
     if (!office || !office.UI || !office.OFFICE_STATE || !document.querySelector("#topbar .brand") ||
@@ -150,7 +210,9 @@
       if (typeof original !== "function") continue;
       office.UI[name] = function (...args) { const value = original.apply(this, args); schedule(); return value; };
     }
+    if (typeof office.UI.renderGate === "function") office.UI.renderGate();
     if (office.VIEW && typeof office.VIEW.dirty === "function") office.VIEW.dirty("main");
+    tintExistingAmpersand();
     if (window.parent !== window && typeof office.UI.openManual === "function") {
       // The host owns the destination. Only a signal leaves the isolated room.
       office.UI.openManual = () => window.parent.postMessage({type: "office-studio:open-manual"}, "*");

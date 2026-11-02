@@ -24,6 +24,12 @@ MAX_LOGO_BYTES = 512_000
 MAX_WORKSPACES = 200
 MAX_DRAFTS = 100
 ID = r"[0-9a-f]{32}"
+LEGAL_AGENT = {
+    "name": "LEGAL", "specialty": "Legal Review", "engine": "Local demo", "color": "indigo", "style": "vest", "systems": [],
+    "instruction": "Prepare legal review questions, document checklists and draft issues for qualified counsel. "
+                   "Do not give legal advice or represent that a lawyer has reviewed an item. "
+                   "Require owner approval before anything is sent, filed, signed or otherwise acted on.",
+}
 
 
 class APIError(Exception):
@@ -261,6 +267,10 @@ def workspace(data):
     names = [item["name"].casefold() for item in result["crew"]]
     if len(set(names)) != len(names):
         raise APIError("Agent names must be unique.")
+    if "legal" not in names:
+        if len(result["crew"]) == 10:
+            raise APIError("Reserve one of the ten desks for Legal. Remove one desk or supply a LEGAL desk.")
+        result["crew"].append(agent(LEGAL_AGENT, intake=True))
     gates = data.get("gates", [])
     if not isinstance(gates, list) or len(gates) > 40:
         raise APIError("gates must contain at most forty items.")
@@ -411,6 +421,9 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         store = self.server.store
         if self.command in ("GET", "HEAD"):
+            if path == "/api/templates/legal":
+                self.json(200, LEGAL_AGENT)
+                return
             room = re.fullmatch(rf"/api/workspaces/({ID})/room", path)
             if room:
                 with store.connection() as db:
@@ -435,6 +448,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             static = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
                       "/help.html": ("help.html", "text/html; charset=utf-8"),
+                      "/assets/ampersand.svg": ("assets/ampersand.svg", "image/svg+xml"),
                       "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/style.css": ("style.css", "text/css; charset=utf-8")}
             pack = re.fullmatch(r"/packs/(re|law|acct|fin|med)\.json", path)
             target = static.get(path)

@@ -167,7 +167,7 @@ class OfficeHTTPTests(unittest.TestCase):
                               "practice": pack["practice"], "crew": pack["crew"], "gates": pack["gates"], "rules": pack["rules"]})
         self.assertNotEqual(first["id"], second["id"])
         self.assertEqual(first["practice"], "Restaurant")
-        self.assertEqual([a["name"] for a in second["crew"]], [a["name"] for a in pack["crew"]])
+        self.assertEqual([a["name"] for a in second["crew"]], [a["name"] for a in pack["crew"]] + ["LEGAL"])
         status, first = self.request("POST", f"/api/workspaces/{first['id']}/agents", {
             "name": "HOST", "specialty": "Reservations", "instruction": "Prepare fictional reservation replies for owner review.",
         })
@@ -244,7 +244,7 @@ class OfficeHTTPTests(unittest.TestCase):
             self.assertEqual(self.request("GET", route)[0], 404, route)
 
     def test_normal_static_routes_and_provider_status(self):
-        for route in ("/", "/index.html", "/app.js", "/style.css", "/packs/re.json", "/packs/law.json", "/packs/acct.json", "/packs/fin.json", "/packs/med.json"):
+        for route in ("/", "/index.html", "/help.html", "/app.js", "/style.css", "/assets/ampersand.svg", "/packs/re.json", "/packs/law.json", "/packs/acct.json", "/packs/fin.json", "/packs/med.json"):
             status, body = self.request("GET", route)
             self.assertEqual(status, 200, route)
             self.assertTrue(body, route)
@@ -261,8 +261,10 @@ class OfficeHTTPTests(unittest.TestCase):
         for name, provider, model in (("CRIMSON", "anthropic", "fixture-claude"), ("HOST", "openai", "fixture-openai-alt")):
             status, item = self.request("POST", base + "/agents/route", {"agent": name, "provider": provider, "model": model})
             self.assertEqual(status, 200, item)
-        self.assertEqual([a["routing"] for a in item["crew"]], [
-            {"provider": "anthropic", "model": "fixture-claude"}, {"provider": "openai", "model": "fixture-openai-alt"}])
+        routes = {a["name"]: a["routing"] for a in item["crew"]}
+        self.assertEqual(routes, {"CRIMSON": {"provider": "anthropic", "model": "fixture-claude"},
+                                 "LEGAL": {"provider": "demo", "model": ""},
+                                 "HOST": {"provider": "openai", "model": "fixture-openai-alt"}})
         sources = self.request("GET", "/api/providers")[1]["providers"]
         openai = next(p for p in sources if p["id"] == "openai")
         self.assertFalse(openai["configured"])
@@ -271,7 +273,7 @@ class OfficeHTTPTests(unittest.TestCase):
         status, item = self.request("POST", base + "/drafts", {"agent": "HOST", "brief": "Fictional brief", "provider": "demo"})
         self.assertEqual(status, 201, item)
         self.assertEqual((item["drafts"][-1]["provider"], item["drafts"][-1]["model"]), ("demo", ""))
-        self.assertEqual(item["crew"][1]["routing"], {"provider": "openai", "model": "fixture-openai-alt"})
+        self.assertEqual(next(a for a in item["crew"] if a["name"] == "HOST")["routing"], {"provider": "openai", "model": "fixture-openai-alt"})
         for route in ({"agent": "HOST", "provider": "openai", "model": "unlisted"},
                       {"agent": "HOST", "provider": "https://example.invalid", "model": "fixture-openai-alt"},
                       {"agent": "CRIMSON", "provider": "demo", "model": "wrong"}):
@@ -280,6 +282,67 @@ class OfficeHTTPTests(unittest.TestCase):
         self.stop_server()
         self.start_server()
         self.assertEqual(self.request("GET", base)[1], item)
+
+    def test_all_five_pack_sources_gain_one_canonical_legal_without_source_edits(self):
+        from room_preview import renderer_pack
+        status, canonical = self.request("GET", "/api/templates/legal")
+        self.assertEqual(status, 200, canonical)
+        self.assertEqual((canonical["name"], canonical["specialty"], canonical["engine"], canonical["color"], canonical["style"]),
+                         ("LEGAL", "Legal Review", "Local demo", "indigo", "vest"))
+        self.assertIn("qualified counsel", canonical["instruction"])
+        self.assertIn("owner approval", canonical["instruction"])
+        self.assertNotIn("routing", canonical)
+        for key in ("re", "law", "acct", "fin", "med"):
+            with self.subTest(pack=key):
+                source = ROOT / "packs" / f"{key}.json"
+                original = source.read_bytes()
+                pack = json.loads(original)
+                item = self.create(self.restaurant(name="Fictional " + key, practice=pack["practice"], crew=pack["crew"],
+                                                   gates=pack["gates"], rules=pack["rules"]))
+                self.assertEqual([a["name"] for a in item["crew"]], [a["name"] for a in pack["crew"]] + ["LEGAL"])
+                legal = item["crew"][-1]
+                self.assertEqual({field: legal[field] for field in canonical}, canonical)
+                self.assertEqual(sum(a["name"].casefold() == "legal" for a in item["crew"]), 1)
+                self.assertEqual(item["gates"], pack["gates"])
+                rendered = renderer_pack(item)
+                self.assertIsNotNone(rendered)
+                names = {a["name"] for a in rendered["crew"]}
+                self.assertTrue(all(g["owner"] in names for g in rendered["gates"]))
+                self.assertEqual(source.read_bytes(), original)
+
+    def test_legal_reservation_never_evicts_or_duplicates_user_desks(self):
+        crew = [{"name": "CRIMSON" if i == 0 else f"DESK{i}", "specialty": "Fictional lane", "instruction": "Prepare a fictional draft."}
+                for i in range(10)]
+        status, error = self.request("POST", "/api/workspaces", self.restaurant(crew=crew, gates=[]))
+        self.assertEqual(status, 400, error)
+        self.assertIn("Legal", error["error"])
+        self.assertEqual(self.request("GET", "/api/workspaces")[1], {"workspaces": []})
+        item = self.create(self.restaurant(crew=crew[:9], gates=[]))
+        self.assertEqual([a["name"] for a in item["crew"]], [a["name"] for a in crew[:9]] + ["LEGAL"])
+        self.assertEqual(len(item["crew"]), 10)
+        for name in ("LEGAL", "Legal", "legal"):
+            with self.subTest(name=name):
+                supplied = [dict(a) for a in crew]
+                supplied[4] = {"name": name, "specialty": "Owner's legal lane", "instruction": "Prepare owner-selected questions for counsel."}
+                saved = self.create(self.restaurant(crew=supplied, gates=[]))
+                self.assertEqual([a["name"] for a in saved["crew"]], [a["name"] for a in supplied])
+                self.assertEqual(saved["crew"][4]["specialty"], supplied[4]["specialty"])
+                self.assertEqual(saved["crew"][4]["instruction"], supplied[4]["instruction"])
+                self.assertEqual(len(saved["crew"]), 10)
+
+    def test_legacy_persisted_office_is_not_changed_on_restart_or_read(self):
+        import server
+        legacy = self.restaurant()
+        legacy.update({"id": "a" * 32, "drafts": [], "manualUrl": ""})
+        self.stop_server()
+        store = server.Store(self.sandbox.name)
+        with store.connection(write=True) as db:
+            db.execute("INSERT INTO workspaces VALUES (?, ?, ?)", (legacy["id"], legacy["name"], json.dumps(legacy)))
+        self.start_server()
+        self.assertEqual(self.request("GET", f"/api/workspaces/{legacy['id']}")[1], legacy)
+        self.stop_server()
+        self.start_server()
+        self.assertEqual(self.request("GET", f"/api/workspaces/{legacy['id']}")[1], legacy)
 
 
 class LoopbackBindingTests(unittest.TestCase):

@@ -148,7 +148,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.fail(404)
             return
         if page:
-            self.reply(200, preview.themed_html(key), "text/html; charset=utf-8", key, hostname)
+            self.reply(200, preview.themed_html(key, hostname), "text/html; charset=utf-8", key, hostname)
         else:
             self.reply(200, json.dumps(pack, ensure_ascii=False, allow_nan=False).encode("utf-8"))
 
@@ -191,7 +191,7 @@ class RoomPreview:
     def pack(self, key):
         return renderer_pack(self.load_workspace(key))
 
-    def themed_html(self, key):
+    def themed_html(self, key, hostname):
         workspace = self.load_workspace(key)
         # This presentation allowlist is separate from the renderer's identity
         # pack. Stored strings are JSON text, never executable markup or code.
@@ -212,9 +212,11 @@ class RoomPreview:
             color = appearance.get("color", "")
             if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
                 color = brand_color if person["name"] == "CRIMSON" else ""
-            agents.append({"agent": person["name"], "title": clean_text(appearance.get("title"), 60) or
-                           ("Head Executive" if person["name"] == "CRIMSON" else person["name"]), "color": color})
-        presentation = {"name": workspace["name"], "color": brand_color, "logo": checked_logo, "agents": agents}
+            default_title = "Head Executive" if person["name"] == "CRIMSON" else (
+                "Legal Review" if person["name"].casefold() == "legal" else person["name"])
+            agents.append({"agent": person["name"], "title": clean_text(appearance.get("title"), 60) or default_title, "color": color})
+        presentation = {"name": workspace["name"], "color": brand_color, "logo": checked_logo, "agents": agents,
+                        "studioOrigin": f"http://{hostname}:{self.studio_port}"}
         encoded = json.dumps(presentation, ensure_ascii=True, allow_nan=False)
         for character, escape in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
             encoded = encoded.replace(character, escape)
