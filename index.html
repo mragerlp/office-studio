@@ -20,6 +20,14 @@
         ><span class="local-label">LOCAL OFFICE SUITES</span></a
       >
       <div class="office-switch">
+        <a
+          id="help-link"
+          class="masthead-help"
+          href="/help.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Help ↗</a
+        >
         <label for="workspace-select" class="sr-only"
           >Current Office Suite</label
         ><select id="workspace-select">
@@ -180,6 +188,15 @@
                 Opens a town/service-area search on OpenStreetMap; no exact
                 location is pinned.
               </p>
+              <a
+                id="manual-open"
+                class="manual-open"
+                target="_blank"
+                rel="noopener noreferrer"
+                referrerpolicy="no-referrer"
+                hidden
+                >Company operating manual ↗</a
+              >
             </div>
           </div>
           <div class="safety-badge">
@@ -314,6 +331,31 @@
               <summary>Office rules & approval gates</summary>
               <p id="office-rules"></p>
               <ul id="office-gates"></ul>
+              <details class="manual-settings">
+                <summary>
+                  Company operating manual
+                  <span class="optional">optional</span>
+                </summary>
+                <form id="manual-form">
+                  <label for="manual-url">Manual URL</label>
+                  <input
+                    id="manual-url"
+                    type="url"
+                    maxlength="2048"
+                    placeholder="https://example.com/your-operating-manual"
+                    autocomplete="off"
+                    aria-describedby="manual-note"
+                  />
+                  <p id="manual-note" class="field-note">
+                    Use an HTTPS link without a username or password. It opens
+                    only when clicked; this app does not fetch, embed, or send
+                    the manual to a model. Leave blank to remove it.
+                  </p>
+                  <button id="save-manual" class="button quiet" type="submit">
+                    Save manual link
+                  </button>
+                </form>
+              </details>
             </details>
           </section>
           <div class="work-column">
@@ -523,6 +565,16 @@
         </div>
       </section>
     </main>
+    <dialog id="field-manual" class="paper manual-dialog" aria-labelledby="field-manual-title">
+      <p class="eyebrow">THE FIELD</p>
+      <h2 id="field-manual-title">Office reference</h2>
+      <p class="field-note" id="field-manual-note"></p>
+      <div class="button-row">
+        <a id="field-manual-link" class="button primary" target="_blank" rel="noopener noreferrer" hidden>Company manual ↗</a>
+        <a class="button quiet" href="/help.html" target="_blank" rel="noopener noreferrer">Office Studio help ↗</a>
+        <button class="button quiet" type="button" id="close-field-manual">Back to room</button>
+      </div>
+    </dialog>
     <footer>
       <span>Office Studio</span>
       <p>Workspaces and decisions are saved on this computer.</p>

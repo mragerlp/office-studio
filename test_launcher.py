@@ -2,7 +2,7 @@
 import errno
 import io
 import os
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 import socket
 import shutil
@@ -15,6 +15,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import launch
+from loopback_server import LoopbackHTTPServer
 
 
 class ReadyHandler(BaseHTTPRequestHandler):
@@ -54,7 +55,7 @@ class LauncherTests(unittest.TestCase):
             occupied = unrelated.getsockname()[1]
 
             def factory(*, port, data_dir, room_file):
-                return ThreadingHTTPServer(("127.0.0.1", port), ReadyHandler)
+                return LoopbackHTTPServer(("127.0.0.1", port), ReadyHandler)
 
             office, fallback = launch.bind_office(factory, occupied, Path("unused"), None)
             self.assertTrue(fallback)

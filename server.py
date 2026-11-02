@@ -12,9 +12,11 @@ import struct
 import uuid
 import zlib
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from loopback_server import LoopbackHTTPServer
 
 ROOT = Path(__file__).resolve().parent
 MAX_BODY = 1_048_576
@@ -249,7 +251,7 @@ def workspace(data):
               "town": text(data.get("town", ""), "town", 100, label=True),
               "practice": text(data.get("practice", "General business"), "practice", 100, required=True, label=True),
               "logo": logo(data.get("logo", "")), "color": data.get("color", "#a70008"),
-              "rules": text(data.get("rules", ""), "rules", 8000), "drafts": []}
+              "rules": text(data.get("rules", ""), "rules", 8000), "manualUrl": "", "drafts": []}
     if not isinstance(result["color"], str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", result["color"]):
         raise APIError("color must be a six-digit hex color.")
     crew = data.get("crew", [])
@@ -432,6 +434,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json(200, item)
                 return
             static = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
+                      "/help.html": ("help.html", "text/html; charset=utf-8"),
                       "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/style.css": ("style.css", "text/css; charset=utf-8")}
             pack = re.fullmatch(r"/packs/(re|law|acct|fin|med)\.json", path)
             target = static.get(path)
@@ -456,6 +459,26 @@ class Handler(BaseHTTPRequestHandler):
                     raise APIError("Workspace limit reached.", 409)
                 db.execute("INSERT INTO workspaces VALUES (?, ?, ?)", (item["id"], item["name"], json.dumps(item, ensure_ascii=False)))
             self.json(201, item)
+            return
+        manual = re.fullmatch(rf"/api/workspaces/({ID})/manual", path)
+        if manual:
+            fields(data, {"url"})
+            url = text(data.get("url"), "Manual URL", 2048, label=True)
+            if url:
+                try:
+                    target = urlsplit(url)
+                    valid = (target.scheme == "https" and target.hostname and target.username is None
+                             and target.password is None and target.port != 0 and "\\" not in url
+                             and not any(c.isspace() for c in url))
+                except ValueError:
+                    valid = False
+                if not valid:
+                    raise APIError("Enter an HTTPS manual link without embedded credentials.")
+            with store.connection(write=True) as db:
+                item = store.get(db, manual[1])
+                item["manualUrl"] = url
+                store.save(db, item)
+            self.json(200, item)
             return
         appearance_match = re.fullmatch(rf"/api/workspaces/({ID})/agents/appearance", path)
         if appearance_match:
@@ -571,7 +594,7 @@ class Handler(BaseHTTPRequestHandler):
     do_GET = do_HEAD = do_POST = do_OPTIONS = do_PUT = do_DELETE = do_PATCH = handle_request
 
 
-class StudioServer(ThreadingHTTPServer):
+class StudioServer(LoopbackHTTPServer):
     room_preview = None
 
     def server_close(self):

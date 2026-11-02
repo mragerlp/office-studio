@@ -7,7 +7,9 @@ import json
 from pathlib import Path
 import re
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
+
+from loopback_server import LoopbackHTTPServer
 
 
 STYLES = {"headset", "blazer", "hoodie", "field", "vest", "site", "press", "robot"}
@@ -176,7 +178,7 @@ class RoomPreview:
         self.theme = Path(__file__).with_name("room_theme.js").read_text(encoding="utf-8")
         self.studio_port = studio_port
         self.issued = set()
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", port), PreviewHandler)
+        self.httpd = LoopbackHTTPServer(("127.0.0.1", port), PreviewHandler)
         self.httpd.daemon_threads = True
         self.httpd.preview = self
         self.thread = threading.Thread(target=self.httpd.serve_forever, name="office-room-preview", daemon=True)

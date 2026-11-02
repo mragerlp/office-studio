@@ -32,6 +32,8 @@ Starter crews cover general business, real estate, law, accounting, financial ad
 
 The optional **Find town on map** link opens an OpenStreetMap search only when clicked. It does not establish an exact location or fetch a map during setup.
 
+**Help** opens the bundled product guide, even offline. Under **Office rules & approval gates**, save a company-specific HTTPS operating-manual link. It is available from the workspace header and from **The Field** in a compatible room. The app opens the manual on request. It does not crawl the site or give model providers its contents.
+
 ## Optional private 3D room
 
 Place an owner-supplied, pack-compatible HTML room beside the launcher as `private-room.html`, or pass its path with `--room-file`. Restart the app. A separate loopback port serves the room with a presentation adapter. It applies the office name, logo, colors and desk titles at runtime while preserving the original file on disk. Its pack contains the office title, crew, rules and gates. The public build includes the adapter and synthetic fixtures. The room artwork is supplied separately by its owner.

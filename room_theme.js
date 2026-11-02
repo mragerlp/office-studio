@@ -10,7 +10,37 @@
   const safeLogo = value => typeof value === "string" && value.length <= 700000 && /^data:image\/(png|jpeg|webp);base64,[\da-z+/=]+$/i.test(value);
   const logo = safeLogo(presentation.logo) ? presentation.logo : "";
   const choices = new Map();
+  const suppliedAgents = new Map(presentation.agents.filter(item => item && typeof item.agent === "string" &&
+    typeof item.title === "string").map(item => [item.agent, item]));
+  const knownIds = new Map();
   let office, attempts = 0, queued = false;
+
+  function preparePaint(person) {
+    if (!person || !person.look || typeof AGENT_COLORS !== "object") return null;
+    const supplied = suppliedAgents.get(person.name);
+    if (!supplied || (knownIds.has(supplied.agent) && knownIds.get(supplied.agent) !== person.id)) return null;
+    if (choices.has(person.id)) return choices.get(person.id);
+    const original = AGENT_COLORS[person.look.color];
+    if (!original) return null;
+    const chosen = safeColor(supplied.color);
+    const choice = {agent: supplied.agent, title: supplied.title, color: chosen ? supplied.color : original.main};
+    const colorKey = "office-theme-" + person.id;
+    const palette = {...original, label: choice.title, main: choice.color, accent: choice.color};
+    AGENT_COLORS[colorKey] = palette;
+    person.look.color = colorKey;
+    if (chosen) person.look.bot = {...person.look.bot, paint: choice.color, deep: 0};
+    // Do not change the display name here: the room still builds its gate
+    // owner-name lookup immediately after publishing each add event.
+    knownIds.set(supplied.agent, person.id);
+    choices.set(person.id, choice);
+    return choice;
+  }
+
+  // The public event API exists before asynchronous boot fetches/seats the
+  // pack. Install once now, so Figure receives the owner's paint at birth.
+  if (window.AgentOffice && typeof window.AgentOffice.on === "function") {
+    window.AgentOffice.on("add", preparePaint);
+  }
 
   function logoImage(marker, label) {
     const image = document.createElement("img");
@@ -55,6 +85,20 @@
     }
     badge(document.querySelector("#panel .tile"), office.UI.selected);
     badge(document.querySelector("#hovercard .tile"), office.UI.hoverId);
+    const state = office.OFFICE_STATE;
+    const panel = document.getElementById("panel");
+    const panelOpen = office.UI.selected && panel && !panel.hidden;
+    const gate = panelOpen ? state.approvals.find(item => item.agentId !== office.UI.selected) : state.approvals[0];
+    if (gate) badge(document.querySelector("#gate .tile"), gate.agentId);
+    for (const [selector, column] of [["#colQueued", "queued"], ["#colProgress", "progress"], ["#colDone", "done"]]) {
+      const container = document.querySelector(selector);
+      if (!container) continue;
+      let tasks = state.tasks.filter(task => task.column === column);
+      if (column === "done") tasks = tasks.sort((x, y) => y.record === x.record ? y.at - x.at : x.record ? 1 : -1).slice(0, 60);
+      container.querySelectorAll(".card").forEach((card, index) => {
+        if (tasks[index]) badge(card.querySelector(".tile"), tasks[index].agentId);
+      });
+    }
   }
 
   function schedule() {
@@ -75,18 +119,13 @@
       const id = state.order.find(key => state.agents[key].name === supplied.agent);
       if (!id) continue;
       const person = state.agents[id];
-      const oldColor = AGENT_COLORS[person.look.color];
-      if (!oldColor) continue;
-      const choice = {agent: supplied.agent, title: supplied.title, color: safeColor(supplied.color) ? supplied.color : oldColor.main};
-      choices.set(id, choice);
+      const choice = choices.get(id) || preparePaint(person);
+      if (!choice) continue;
       // Native UI draws display names; its IDs, task owners, and gate owners
       // remain the same. Presentation never changes the saved workspace crew.
       person.name = choice.title;
       person.monogram = choice.title.split(/\s+/).map(part => part[0] || "").join("").slice(0, 2).toUpperCase();
-      const colorKey = "office-theme-" + id;
-      const palette = {...oldColor, label: choice.title, main: choice.color, accent: choice.color};
-      AGENT_COLORS[colorKey] = palette;
-      person.look.color = colorKey;
+      const palette = AGENT_COLORS[person.look.color];
       const rendered = office.WORLD && office.WORLD.byId[id];
       if (rendered && rendered.fig) rendered.fig.colors = palette;
       if (rendered && rendered.st) {
@@ -112,6 +151,10 @@
       office.UI[name] = function (...args) { const value = original.apply(this, args); schedule(); return value; };
     }
     if (office.VIEW && typeof office.VIEW.dirty === "function") office.VIEW.dirty("main");
+    if (window.parent !== window && typeof office.UI.openManual === "function") {
+      // The host owns the destination. Only a signal leaves the isolated room.
+      office.UI.openManual = () => window.parent.postMessage({type: "office-studio:open-manual"}, "*");
+    }
     document.title = presentation.name + " · Office Suite";
     document.documentElement.dataset.officeTheme = "ready";
     new MutationObserver(schedule).observe(document.body, {childList: true, subtree: true, characterData: true});

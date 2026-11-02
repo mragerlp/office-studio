@@ -343,6 +343,7 @@ function setBusy(value) {
   updateProviderNote();
   $("save-appearance").disabled = value || !selectedAgent();
   $("reset-appearance").disabled = value || !selectedAgent();
+  $("save-manual").disabled = value || !state.workspace;
   if (state.workspace) renderRouteModels($("route-model").value);
 }
 function renderSelector() {
@@ -655,6 +656,30 @@ function draftRouteLabel(draft) {
     : providerLabel(draft.provider) +
         (draft.model ? " / " + draft.model : " / model not recorded");
 }
+function manualURL(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" &&
+      url.hostname &&
+      !url.username &&
+      !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+function renderManual(workspace) {
+  const url = manualURL(workspace.manualUrl || "");
+  $("save-manual").disabled = state.busy;
+  $("manual-url").value = url || "";
+  $("manual-open").hidden = !url;
+  if (url) $("manual-open").href = url;
+  else $("manual-open").removeAttribute("href");
+}
 function roomSignature(workspace) {
   return JSON.stringify([
     workspace.name,
@@ -877,6 +902,7 @@ function renderWorkspace() {
       el("li", "", `${agentDisplayLabel(gate.owner)} · ${gate.need}`),
     );
   renderDrafts();
+  renderManual(workspace);
   syncOfficeRoom();
 }
 function renderDrafts() {
@@ -969,6 +995,38 @@ async function mutateWorkspace(path, body, after) {
 
 $("view-room").addEventListener("click", () => chooseOfficeView("room"));
 $("view-desks").addEventListener("click", () => chooseOfficeView("desks"));
+window.addEventListener("message", (event) => {
+  const frame = state.roomFrame;
+  if (!frame || !state.workspace || state.roomFrameId !== state.workspace.id ||
+      event.source !== frame.contentWindow || !localRoomURL(frame.src) ||
+      event.origin !== new URL(frame.src).origin || event.data?.type !== "office-studio:open-manual") return;
+  const url = manualURL(state.workspace.manualUrl || "");
+  const link = $("field-manual-link");
+  link.hidden = !url;
+  if (url) link.href = url;
+  else link.removeAttribute("href");
+  $("field-manual-note").textContent = url
+    ? "Open this company's workflow reference or the local guide to using Office Studio."
+    : "You can save this company's manual under Desks & drafts → Office rules & approval gates.";
+  if (!$("field-manual").open) $("field-manual").showModal();
+});
+$("close-field-manual").addEventListener("click", () => $("field-manual").close());
+$("manual-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const url = manualURL($("manual-url").value);
+  if (url === null) {
+    notice("Use an HTTPS manual URL without a username or password.", true);
+    $("manual-url").focus();
+    return;
+  }
+  mutateWorkspace("/manual", { url }, () =>
+    notice(
+      url
+        ? "Manual link saved. It opens only when you choose it."
+        : "Manual link removed.",
+    ),
+  );
+});
 $("new-office").addEventListener("click", showSetup);
 $("workspace-select").addEventListener("change", (event) =>
   selectWorkspace(event.target.value),

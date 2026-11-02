@@ -7,10 +7,13 @@ no model network requests are made.
 from __future__ import annotations
 
 import base64
+from collections import deque
+import http.client
 import json
 import os
 from pathlib import Path
 import socket
+import re
 import struct
 import subprocess
 import sys
@@ -19,8 +22,7 @@ import time
 import threading
 import unittest
 from unittest.mock import patch
-import urllib.error
-import urllib.request
+from urllib.parse import urlsplit
 import zlib
 
 
@@ -53,23 +55,56 @@ class OfficeHTTPTests(unittest.TestCase):
         self.start_server()
 
     def start_server(self):
+        self.startup_started = time.monotonic()
+        self.startup_events = deque(maxlen=20)
+        self.startup_lock = threading.Lock()
         self.process = subprocess.Popen(
-            [sys.executable, "-B", str(ROOT / "server.py"), "--port", str(self.port), "--data-dir", self.sandbox.name],
+            [sys.executable, "-u", "-B", str(ROOT / "server.py"), "--port", str(self.port), "--data-dir", self.sandbox.name],
             cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             env=self.server_env,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        deadline = time.monotonic() + 10
+        self.startup_reader = threading.Thread(target=self.capture_startup, args=(self.process.stdout,), daemon=True)
+        self.startup_reader.start()
+        deadline = self.startup_started + 10
+        attempts, last_error = 0, "no connection attempted"
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                self.fail("Server exited during startup: " + self.process.communicate()[0].decode("utf-8", "replace"))
+                self.startup_reader.join(timeout=1)
+                self.fail("Server exited during startup: " + self.startup_diagnostics(attempts, last_error))
+            attempts += 1
             try:
-                if self.request("GET", "/api/workspaces")[0] == 200:
+                status = self.request("GET", "/api/workspaces", timeout=0.25)[0]
+                if status == 200:
                     return
-            except (OSError, urllib.error.URLError):
-                pass
+                last_error = f"HTTP {status}"
+            except (OSError, http.client.HTTPException) as error:
+                last_error = type(error).__name__
             time.sleep(0.05)
-        self.fail("Loopback server was not ready within ten seconds.")
+        self.fail("Loopback server was not ready within ten seconds. " + self.startup_diagnostics(attempts, last_error))
+
+    def capture_startup(self, output):
+        # Keep bounded timing evidence without echoing arbitrary child output,
+        # request data, environment values or exception messages into CI logs.
+        while raw := output.readline(2048):
+            line = raw.decode("utf-8", "replace").strip()
+            if re.fullmatch(r"Office Studio: http://127\.0\.0\.1:[0-9]+/?", line):
+                safe = line
+            elif line == "Workspace storage stays on this computer. Press Ctrl+C to stop.":
+                safe = line
+            else:
+                kind = re.match(r"([A-Za-z][A-Za-z0-9_]*(?:Error|Exception)):", line)
+                safe = (kind[1] + " (details omitted)") if kind else "[other startup output omitted]"
+            with self.startup_lock:
+                self.startup_events.append(f"+{time.monotonic() - self.startup_started:.3f}s {safe}")
+
+    def startup_diagnostics(self, attempts, last_error):
+        with self.startup_lock:
+            captured = list(self.startup_events)
+        status = self.process.poll()
+        child = "running" if status is None else f"exit {status}"
+        return (f"elapsed={time.monotonic() - self.startup_started:.3f}s; child={child}; "
+                f"attempts={attempts}; last={last_error}; startup=" + (" | ".join(captured) or "[no startup output]"))
 
     def stop_server(self):
         if self.process is not None:
@@ -80,24 +115,25 @@ class OfficeHTTPTests(unittest.TestCase):
                 except subprocess.TimeoutExpired:
                     self.process.kill()
                     self.process.wait(timeout=5)
-            self.process.communicate(timeout=5)
+            self.startup_reader.join(timeout=1)
+            self.process.stdout.close()
             self.process = None
 
-    def request(self, method, route, data=None, headers=None):
+    def request(self, method, route, data=None, headers=None, *, timeout=5):
         payload = None if data is None else json.dumps(data).encode("utf-8")
         combined = {"Content-Type": "application/json"} if data is not None else {}
         combined.update(headers or {})
-        req = urllib.request.Request(self.base + route, data=payload, headers=combined, method=method)
-        # Explicitly bypass environment proxies: test traffic remains loopback.
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        # Numeric HTTPConnection never consults urllib or macOS proxy settings.
+        connection = http.client.HTTPConnection("127.0.0.1", urlsplit(self.base).port, timeout=timeout)
         try:
-            response = opener.open(req, timeout=5)
-        except urllib.error.HTTPError as error:
-            response = error
-        with response:
+            connection.request(method, route, body=payload, headers=combined)
+            response = connection.getresponse()
             body = response.read()
-            value = json.loads(body) if response.headers.get_content_type() == "application/json" else body.decode("utf-8")
+            kind = response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
+            value = json.loads(body) if kind == "application/json" else body.decode("utf-8")
             return response.status, value
+        finally:
+            connection.close()
 
     def restaurant(self, **changes):
         result = {
@@ -161,6 +197,21 @@ class OfficeHTTPTests(unittest.TestCase):
             self.assertEqual(self.request("POST", route, {"decision": competing})[0], 409)
             self.assertEqual(self.request("GET", f"/api/workspaces/{item['id']}")[1], decided)
             item = decided
+
+    def test_company_manual_is_an_optional_per_office_https_link(self):
+        _, office = self.request("POST", "/api/workspaces", self.restaurant())
+        _, other = self.request("POST", "/api/workspaces", self.restaurant(name="Other office"))
+        route = "/api/workspaces/" + office["id"]
+        url = "https://example.org/office-manual#map"
+        self.assertEqual(self.request("POST", route + "/manual", {"url": url})[1]["manualUrl"], url)
+        for unsafe in ("javascript:alert(1)", "http://example.org", "https://user:pass@example.org", "https://example.org\\@elsewhere"):
+            self.assertEqual(self.request("POST", route + "/manual", {"url": unsafe})[0], 400)
+        self.assertEqual(self.request("GET", route)[1]["manualUrl"], url)
+        self.assertEqual(self.request("GET", "/api/workspaces/" + other["id"])[1]["manualUrl"], "")
+        self.assertEqual(self.request("POST", route + "/manual", {"url": ""})[1]["manualUrl"], "")
+        status, guide = self.request("GET", "/help.html")
+        self.assertEqual(status, 200)
+        self.assertIn("Your company's manual", guide)
 
     def test_workspace_references_do_not_cross(self):
         first, draft = self.draft(self.create())
@@ -229,6 +280,34 @@ class OfficeHTTPTests(unittest.TestCase):
         self.stop_server()
         self.start_server()
         self.assertEqual(self.request("GET", base)[1], item)
+
+
+class LoopbackBindingTests(unittest.TestCase):
+    def test_numeric_loopback_bind_never_calls_reverse_dns(self):
+        import server
+        with tempfile.TemporaryDirectory(prefix="office-bind-") as directory, patch.object(socket, "getfqdn", side_effect=AssertionError("reverse lookup must not run")) as lookup:
+            httpd = server.create_server(0, directory)
+            try:
+                self.assertEqual(httpd.server_name, "127.0.0.1")
+                self.assertEqual(httpd.server_port, httpd.socket.getsockname()[1])
+                lookup.assert_not_called()
+            finally:
+                httpd.server_close()
+
+    def test_optional_room_bind_never_calls_reverse_dns(self):
+        import server
+        with tempfile.TemporaryDirectory(prefix="office-room-bind-") as directory, patch.object(socket, "getfqdn", side_effect=AssertionError("reverse lookup must not run")) as lookup:
+            room = Path(directory) / "synthetic-room.html"
+            room.write_text("<!doctype html><title>Synthetic local room</title>", encoding="utf-8")
+            httpd = server.create_server(0, Path(directory) / "storage", room_file=room)
+            try:
+                preview = httpd.room_preview.httpd
+                self.assertEqual(preview.server_name, "127.0.0.1")
+                self.assertEqual(preview.server_port, preview.socket.getsockname()[1])
+                self.assertNotEqual(preview.server_port, httpd.server_port)
+                lookup.assert_not_called()
+            finally:
+                httpd.server_close()
 
 
 class RoutedDraftTests(unittest.TestCase):
