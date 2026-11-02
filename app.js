@@ -1,0 +1,899 @@
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const palette = {
+  crimson: "#a70008",
+  azure: "#2369dd",
+  teal: "#16847f",
+  orange: "#b87636",
+  violet: "#7b46db",
+  plum: "#ad4d83",
+  indigo: "#5763a0",
+  green: "#487445",
+  lime: "#7a8e42",
+};
+const state = {
+  workspace: null,
+  workspaces: [],
+  providers: [],
+  epoch: 0,
+  selectedId: "",
+  draftId: "",
+  deskKey: "",
+  busy: false,
+  template: null,
+  templateEpoch: 0,
+  logo: "",
+};
+const genericPack = {
+  practice: "General business",
+  crew: [
+    {
+      name: "CRIMSON",
+      specialty: "Chief of Staff",
+      instruction:
+        "Coordinate the crew and prepare every decision for the owner. Use placeholders only. Nothing leaves the office without owner approval.",
+      color: "teal",
+    },
+    {
+      name: "GUEST DESK",
+      specialty: "Guest communications",
+      instruction:
+        "Prepare friendly guest communications for owner review. Use synthetic placeholders. Do not send messages or make reservations.",
+      color: "azure",
+    },
+    {
+      name: "OPERATIONS",
+      specialty: "Daily operations",
+      instruction:
+        "Prepare checklists, schedules and operating notes for owner review. Do not change outside systems.",
+      color: "green",
+    },
+    {
+      name: "EDITOR",
+      specialty: "Content drafts",
+      instruction:
+        "Prepare clear announcements and content for owner review. No publishing or external actions.",
+      color: "orange",
+    },
+  ],
+  gates: [
+    {
+      owner: "CRIMSON",
+      need: "Anything sent, published, booked, purchased or changed outside this office",
+      brief: {
+        action:
+          "Prepare a draft for the owner. Record the decision only; the owner handles any outside action.",
+        ifDecline: "Keep the draft here for revision.",
+      },
+    },
+  ],
+  rules:
+    "Use synthetic information and placeholders. Prepare drafts only. The owner reviews every outside action; recording approval does not perform it.",
+};
+
+async function api(path, body) {
+  const response = await fetch(
+    path,
+    body === undefined
+      ? { cache: "no-store" }
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+  );
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("The local server returned an unreadable response.");
+  }
+  if (!response.ok)
+    throw new Error(
+      typeof result.error === "string"
+        ? result.error
+        : "The local server could not complete this request.",
+    );
+  return result;
+}
+function notice(message, error = false) {
+  const box = $("notice");
+  box.textContent = message;
+  box.classList.toggle("error", error);
+  box.hidden = !message;
+}
+function el(tag, className, text) {
+  const item = document.createElement(tag);
+  if (className) item.className = className;
+  if (text !== undefined) item.textContent = String(text);
+  return item;
+}
+function option(value, label, disabled = false) {
+  const item = el("option", "", label);
+  item.value = value;
+  item.disabled = disabled;
+  return item;
+}
+function isCurrent(id, epoch) {
+  // A response belongs to the workspace selection that started its request.
+  // Selecting another office invalidates outstanding reads and mutations.
+  return state.selectedId === id && state.epoch === epoch;
+}
+function safeColor(value) {
+  return /^#[a-f\d]{6}$/i.test(value || "") ? value : "#285b53";
+}
+function applyAccent(value) {
+  const color = safeColor(value);
+  document.documentElement.style.setProperty("--accent", color);
+  const rgb = color
+    .slice(1)
+    .match(/../g)
+    .map((x) => parseInt(x, 16) / 255)
+    .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  document.documentElement.style.setProperty(
+    "--accent-ink",
+    luminance > 0.18 ? "#17281f" : "#ffffff",
+  );
+}
+function resetWorkspaceForms() {
+  $("draft-brief").value = "";
+  $("draft-provider").value = "route";
+  state.deskKey = "";
+  $("add-agent-form").reset();
+  $("add-agent-form").hidden = true;
+  $("show-add-agent").hidden = false;
+}
+function updatePracticeLabel() {
+  const general = $("practice").value === "generic";
+  $("practice-label-field").hidden = !general;
+  $("practice-label").required = general;
+}
+function validLogo(value) {
+  return (
+    typeof value === "string" &&
+    /^data:image\/(png|jpeg|webp);base64,[a-z\d+/=]+$/i.test(value) &&
+    value.length < 280000
+  );
+}
+function setBusy(value) {
+  state.busy = value;
+  $("generate-draft").disabled = value;
+  $("approve-draft").disabled = value;
+  $("decline-draft").disabled = value;
+  $("draft-provider").disabled = value;
+  $("add-agent-form").querySelector("button[type=submit]").disabled = value;
+  $("generate-draft").firstChild.textContent = value
+    ? "Please wait…"
+    : "Prepare draft ";
+  updateProviderNote();
+  if (state.workspace) renderRouteModels($("route-model").value);
+}
+function renderSelector() {
+  const select = $("workspace-select");
+  select.replaceChildren(option("", "Choose an office"));
+  for (const office of state.workspaces)
+    select.append(option(office.id, office.name));
+  select.value = state.selectedId;
+}
+function registerWorkspace(workspace) {
+  const existing = state.workspaces.findIndex(
+    (item) => item.id === workspace.id,
+  );
+  const summary = { id: workspace.id, name: workspace.name };
+  if (existing < 0) state.workspaces.push(summary);
+  else state.workspaces[existing] = summary;
+  renderSelector();
+}
+function renderTemplate() {
+  const box = $("template-preview");
+  box.replaceChildren();
+  const pack = state.template;
+  if (!pack) {
+    box.append(
+      el("strong", "", "Loading the template…"),
+      el("p", "", "Preparing the crew and approval gates."),
+    );
+    return;
+  }
+  box.append(
+    el(
+      "strong",
+      "",
+      `${pack.crew.length} desks · ${pack.gates.length} approval gate${pack.gates.length === 1 ? "" : "s"}`,
+    ),
+    el("p", "", pack.crew.map((a) => a.name).join(" / ")),
+  );
+}
+function checkedPack(pack) {
+  if (
+    !pack ||
+    typeof pack !== "object" ||
+    !Array.isArray(pack.crew) ||
+    !pack.crew.length ||
+    pack.crew.length > 10 ||
+    !Array.isArray(pack.gates) ||
+    typeof pack.rules !== "string"
+  )
+    throw new Error(
+      "Choose an intake pack with 1–10 agents, approval gates, and office rules.",
+    );
+  const seen = new Set();
+  for (const agent of pack.crew) {
+    if (
+      !agent ||
+      typeof agent.name !== "string" ||
+      !agent.name.trim() ||
+      agent.name.length > 14 ||
+      typeof agent.specialty !== "string" ||
+      typeof agent.instruction !== "string" ||
+      seen.has(agent.name)
+    )
+      throw new Error(
+        "Each agent needs a unique name (up to 14 characters), specialty, and instruction.",
+      );
+    seen.add(agent.name);
+  }
+  for (const gate of pack.gates) {
+    if (
+      !gate ||
+      typeof gate.owner !== "string" ||
+      typeof gate.need !== "string"
+    )
+      throw new Error("Each approval gate needs an owner and a need.");
+  }
+  return pack;
+}
+async function loadTemplate() {
+  const epoch = ++state.templateEpoch;
+  state.template = null;
+  $("create-office").disabled = true;
+  renderTemplate();
+  try {
+    const key = $("practice").value;
+    const pack =
+      key === "generic"
+        ? structuredClone(genericPack)
+        : await api(`/packs/${encodeURIComponent(key)}.json`);
+    if (epoch !== state.templateEpoch) return;
+    state.template = checkedPack(pack);
+    renderTemplate();
+  } catch (error) {
+    if (epoch !== state.templateEpoch) return;
+    notice(error.message, true);
+    $("template-preview").replaceChildren(
+      el(
+        "p",
+        "",
+        "Template unavailable. Choose another template or import a pack.",
+      ),
+    );
+  } finally {
+    if (epoch === state.templateEpoch)
+      $("create-office").disabled = !state.template;
+  }
+}
+function showSetup() {
+  resetWorkspaceForms();
+  $("office-form").reset();
+  clearLogo();
+  updatePracticeLabel();
+  loadTemplate();
+  history.replaceState(null, "", location.pathname);
+  ++state.epoch;
+  state.selectedId = "";
+  state.workspace = null;
+  setBusy(false);
+  renderSelector();
+  $("setup").hidden = false;
+  $("workspace").hidden = true;
+  applyAccent($("office-color").value);
+  notice("");
+  $("office-name").focus();
+}
+async function selectWorkspace(id) {
+  if (!id) {
+    showSetup();
+    return;
+  }
+  const epoch = ++state.epoch;
+  resetWorkspaceForms();
+  state.selectedId = id;
+  state.workspace = null;
+  state.draftId = "";
+  setBusy(false);
+  renderSelector();
+  $("setup").hidden = true;
+  $("workspace").hidden = true;
+  notice("Opening your office…");
+  try {
+    const workspace = await api(`/api/workspaces/${encodeURIComponent(id)}`);
+    if (!isCurrent(id, epoch)) return;
+    state.workspace = workspace;
+    notice("");
+    renderWorkspace();
+  } catch (error) {
+    if (isCurrent(id, epoch)) {
+      notice(error.message, true);
+      $("setup").hidden = false;
+    }
+  }
+}
+function selectedAgent() {
+  return state.workspace?.crew.find(
+    (agent) => agent.name === $("draft-agent").value,
+  );
+}
+function savedRoute(agent = selectedAgent()) {
+  return agent?.routing || { provider: "demo", model: "" };
+}
+function providerModels(provider) {
+  return Array.isArray(provider?.models)
+    ? provider.models.filter((model) => typeof model === "string" && model)
+    : [];
+}
+function providerLabel(id) {
+  return state.providers.find((provider) => provider.id === id)?.label || id;
+}
+function canSaveRoute(provider, model) {
+  return provider?.id === "demo" || providerModels(provider).includes(model);
+}
+function routeInfo(route) {
+  const provider = state.providers.find((item) => item.id === route.provider);
+  if (route.provider === "demo")
+    return {
+      provider,
+      model: "",
+      available: !!provider?.configured,
+      label: "Local demo · simulated",
+    };
+  const models = providerModels(provider);
+  const model = route.model || models[0] || "";
+  const available = !!provider?.configured && models.includes(model);
+  return {
+    provider,
+    model,
+    available,
+    label:
+      providerLabel(route.provider) +
+      (model ? " / " + model : " / no model configured"),
+  };
+}
+function renderProviders() {
+  const select = $("route-provider");
+  select.replaceChildren();
+  const rank = { demo: 0, openai: 1, anthropic: 2, gemini: 3 };
+  for (const provider of [...state.providers].sort(
+    (a, b) => (rank[a.id] ?? 9) - (rank[b.id] ?? 9),
+  )) {
+    select.append(
+      option(
+        provider.id,
+        provider.id === "demo"
+          ? "Local demo · simulated"
+          : provider.label +
+              (provider.configured
+                ? " · configured on host"
+                : " · not configured"),
+        provider.id !== "demo" && !providerModels(provider).length,
+      ),
+    );
+  }
+  const draftSelect = $("draft-provider");
+  const previous = draftSelect.value;
+  draftSelect.replaceChildren(
+    option("route", "Use saved desk route"),
+    option("demo", "Local demo · this draft only"),
+  );
+  draftSelect.value = previous === "demo" ? "demo" : "route";
+  if (state.workspace) updateAgent();
+  else updateProviderNote();
+}
+function renderRouteModels(preferred = "") {
+  const provider = state.providers.find(
+    (item) => item.id === $("route-provider").value,
+  );
+  const select = $("route-model");
+  select.replaceChildren();
+  if (provider?.id === "demo") {
+    select.append(option("", "No model · simulated locally"));
+    select.disabled = true;
+  } else {
+    const models = providerModels(provider);
+    for (const model of models) select.append(option(model, model));
+    if (preferred && !models.includes(preferred))
+      select.append(option(preferred, preferred + " · unavailable", true));
+    if (!models.length && !preferred)
+      select.append(option("", "No host-allowed models", true));
+    select.value = preferred || models[0] || "";
+    select.disabled = !models.length;
+  }
+  const valid = canSaveRoute(provider, select.value);
+  $("save-route").disabled = state.busy || !selectedAgent() || !valid;
+  $("route-status").textContent =
+    provider?.id === "demo"
+      ? "Local demo uses no model connection or credentials."
+      : provider?.configured
+        ? "Configured on this host. This status does not test credentials or model access."
+        : providerModels(provider).length
+          ? "You can save a model preference now. Live drafting requires a provider key on this computer."
+          : "Add an allowed model on the host to save this provider.";
+}
+function renderDeskSettings() {
+  const agent = selectedAgent();
+  const route = savedRoute(agent);
+  const info = routeInfo(route);
+  $("route-agent").textContent = agent
+    ? "Saved preference for " +
+      agent.name +
+      ". Applies to future drafts from this desk."
+    : "Choose a desk first.";
+  $("saved-route-label").textContent =
+    info.label + (info.available ? "" : " · unavailable");
+  const select = $("route-provider");
+  if (!state.providers.some((provider) => provider.id === route.provider))
+    select.append(
+      option(route.provider, route.provider + " · unavailable", true),
+    );
+  select.value = route.provider;
+  renderRouteModels(route.model || "");
+}
+function updateProviderNote() {
+  const override = $("draft-provider").value === "demo";
+  const info = routeInfo(
+    override ? { provider: "demo", model: "" } : savedRoute(),
+  );
+  $("provider-note").textContent = !info.available
+    ? "This desk’s saved route is unavailable. Choose Local demo for this draft or update Desk settings; no live fallback will be used."
+    : info.provider?.id === "demo"
+      ? override
+        ? "Temporary Local demo override. The saved desk route stays unchanged."
+        : "Saved route: Local demo. Simulated output; no model connection is used."
+      : "Saved route: " +
+        info.label +
+        ". This provider receives the brief, the selected agent’s instructions and office rules. Host configuration does not verify account access.";
+  $("generate-draft").disabled =
+    state.busy || !selectedAgent() || !info.available;
+}
+function updateAgent() {
+  const name = $("draft-agent").value;
+  const agent = selectedAgent();
+  const key = state.selectedId + ":" + name;
+  if (state.deskKey !== key) {
+    state.deskKey = key;
+    $("draft-provider").value = "route";
+  }
+  $("agent-description").textContent = agent ? agent.specialty : "";
+  for (const button of $("desks").children)
+    button.setAttribute("aria-pressed", String(button.dataset.agent === name));
+  renderDeskSettings();
+  updateProviderNote();
+}
+function draftRouteLabel(draft) {
+  return draft.provider === "demo"
+    ? "Local demo · simulated"
+    : providerLabel(draft.provider) +
+        (draft.model ? " / " + draft.model : " / model not recorded");
+}
+function renderWorkspace() {
+  const workspace = state.workspace;
+  if (!workspace) return;
+  history.replaceState(null, "", "#office/" + workspace.id);
+  $("setup").hidden = true;
+  $("workspace").hidden = false;
+  applyAccent(workspace.color);
+  $("workspace-title").textContent = workspace.name;
+  $("workspace-town").textContent =
+    workspace.town || "Your local working space";
+  $("town-map").hidden = !workspace.town;
+  $("map-note").hidden = !workspace.town;
+  if (workspace.town)
+    $("town-map").href =
+      "https://www.openstreetmap.org/search?query=" +
+      encodeURIComponent(workspace.town);
+  else $("town-map").removeAttribute("href");
+  const logo = $("workspace-logo");
+  logo.hidden = !validLogo(workspace.logo);
+  if (!logo.hidden) {
+    logo.src = workspace.logo;
+    logo.alt = workspace.name + " logo";
+  } else logo.removeAttribute("src");
+  const previous = $("draft-agent").value;
+  $("draft-agent").replaceChildren();
+  $("desks").replaceChildren();
+  workspace.crew.forEach((agent, index) => {
+    const desk = el("button", "desk");
+    desk.type = "button";
+    desk.dataset.agent = agent.name;
+    desk.setAttribute(
+      "aria-label",
+      `${agent.name}, ${agent.specialty}. Prepare a brief.`,
+    );
+    desk.style.setProperty(
+      "--desk-color",
+      palette[agent.color] || safeColor(workspace.color),
+    );
+    desk.append(
+      el("span", "desk-avatar", ""),
+      el("strong", "", agent.name),
+      el("small", "", agent.specialty),
+    );
+    desk.addEventListener("click", () => {
+      $("draft-agent").value = agent.name;
+      updateAgent();
+      $("draft-brief").focus();
+    });
+    $("desks").append(desk);
+    $("draft-agent").append(
+      option(agent.name, `${agent.name} · ${agent.specialty}`),
+    );
+  });
+  if (workspace.crew.some((a) => a.name === previous))
+    $("draft-agent").value = previous;
+  updateAgent();
+  $("crew-count").textContent = `${workspace.crew.length} / 10 seats`;
+  $("show-add-agent").disabled = workspace.crew.length >= 10;
+  $("show-add-agent").textContent =
+    workspace.crew.length >= 10 ? "All ten desks are taken" : "+ Add a desk";
+  $("office-rules").textContent = workspace.rules || "";
+  $("office-gates").replaceChildren();
+  for (const gate of workspace.gates || [])
+    $("office-gates").append(el("li", "", `${gate.owner} · ${gate.need}`));
+  renderDrafts();
+}
+function renderDrafts() {
+  const drafts = state.workspace?.drafts || [];
+  if (!drafts.some((d) => d.id === state.draftId))
+    state.draftId =
+      [...drafts].reverse().find((d) => d.status === "pending")?.id ||
+      drafts.at(-1)?.id ||
+      "";
+  const pending = drafts.filter((d) => d.status === "pending").length;
+  $("pending-count").textContent = String(pending);
+  $("table-count").textContent = pending
+    ? `${pending} draft${pending === 1 ? "" : "s"} waiting for you`
+    : "Your decisions come here";
+  const list = $("draft-list");
+  list.replaceChildren();
+  if (!drafts.length)
+    list.append(
+      el(
+        "p",
+        "empty-inbox",
+        "Your table is clear. Choose a desk and prepare your first draft; it will arrive here for review.",
+      ),
+    );
+  for (const draft of [...drafts].reverse()) {
+    const item = el("button", "draft-item");
+    item.type = "button";
+    item.setAttribute("aria-pressed", String(draft.id === state.draftId));
+    const copy = el("div");
+    copy.append(
+      el("strong", "", draft.brief),
+      el("small", "", `${draft.agent} · ${draftRouteLabel(draft)}`),
+    );
+    item.append(copy, el("span", `state-pill ${draft.status}`, draft.status));
+    item.addEventListener("click", () => {
+      state.draftId = draft.id;
+      renderDrafts();
+    });
+    list.append(item);
+  }
+  if (!drafts.some((d) => d.id === state.draftId))
+    state.draftId =
+      [...drafts].reverse().find((d) => d.status === "pending")?.id ||
+      drafts.at(-1)?.id ||
+      "";
+  const draft = drafts.find((d) => d.id === state.draftId);
+  $("draft-preview").hidden = !draft;
+  if (!draft) return;
+  $("preview-status").textContent = draft.status;
+  $("preview-status").className = `state-pill ${draft.status}`;
+  $("preview-provider").textContent =
+    draft.provider === "demo" ? "SIMULATED DRAFT" : draftRouteLabel(draft);
+  $("preview-brief").textContent = draft.brief;
+  $("preview-agent").textContent = `Prepared with ${draft.agent}`;
+  $("preview-text").textContent = draft.text;
+  $("decision-buttons").hidden = draft.status !== "pending";
+  $("decision-note").textContent =
+    draft.status === "approved"
+      ? "Approval recorded here. No outside action was performed."
+      : draft.status === "declined"
+        ? "Declined and kept here for reference. Prepare a new draft to revise the work."
+        : "Review the complete text. Your decision is a record only.";
+}
+async function mutateWorkspace(path, body, after) {
+  if (state.busy || !state.workspace) return;
+  const id = state.selectedId,
+    epoch = state.epoch;
+  setBusy(true);
+  notice("");
+  try {
+    const workspace = await api(
+      `/api/workspaces/${encodeURIComponent(id)}${path}`,
+      body,
+    );
+    if (!isCurrent(id, epoch)) return;
+    state.workspace = workspace;
+    if (after) after(workspace);
+    renderWorkspace();
+  } catch (error) {
+    if (isCurrent(id, epoch)) notice(error.message, true);
+  } finally {
+    if (isCurrent(id, epoch)) setBusy(false);
+  }
+}
+
+$("new-office").addEventListener("click", showSetup);
+$("workspace-select").addEventListener("change", (event) =>
+  selectWorkspace(event.target.value),
+);
+$("practice").addEventListener("change", () => {
+  updatePracticeLabel();
+  notice("");
+  $("import-pack").value = "";
+  loadTemplate();
+});
+$("office-color").addEventListener("input", () =>
+  applyAccent($("office-color").value),
+);
+$("office-logo").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (
+    !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+    file.size > 200 * 1024
+  ) {
+    event.target.value = "";
+    notice("Choose a PNG, JPEG or WebP logo no larger than 200 KB.", true);
+    return;
+  }
+  const original = file;
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("The logo could not be read."));
+      reader.readAsDataURL(file);
+    });
+    if ($("office-logo").files[0] !== original) return;
+    if (!validLogo(data))
+      throw new Error(
+        "This logo could not be used. Please choose another image.",
+      );
+    state.logo = data;
+    $("logo-preview").src = data;
+    $("logo-preview").hidden = false;
+    $("clear-logo").hidden = false;
+    notice("");
+  } catch (error) {
+    notice(error.message, true);
+  }
+});
+function clearLogo() {
+  state.logo = "";
+  $("office-logo").value = "";
+  $("logo-preview").hidden = true;
+  $("logo-preview").removeAttribute("src");
+  $("clear-logo").hidden = true;
+}
+$("clear-logo").addEventListener("click", clearLogo);
+$("import-pack").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const epoch = ++state.templateEpoch;
+  $("create-office").disabled = true;
+  try {
+    if (file.size > 500 * 1024)
+      throw new Error("Keep intake JSON below 500 KB.");
+    const pack = checkedPack(JSON.parse(await file.text()));
+    if (epoch !== state.templateEpoch) return;
+    state.template = pack;
+    $("practice").value = "generic";
+    $("practice-label").value = pack.practice || "Imported practice";
+    updatePracticeLabel();
+    renderTemplate();
+    notice(
+      "Intake crew, gates and rules imported. Keep all demonstration information synthetic.",
+    );
+  } catch (error) {
+    if (epoch === state.templateEpoch) {
+      state.template = null;
+      renderTemplate();
+      notice(
+        error instanceof SyntaxError
+          ? "This file is not valid JSON."
+          : error.message,
+        true,
+      );
+    }
+  } finally {
+    if (epoch === state.templateEpoch)
+      $("create-office").disabled = !state.template;
+  }
+});
+$("office-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.template) return;
+  const button = $("create-office");
+  button.disabled = true;
+  const epoch = ++state.epoch;
+  notice("Creating your office…");
+  try {
+    const template = state.template;
+    const workspace = await api("/api/workspaces", {
+      name: $("office-name").value.trim(),
+      town: $("office-town").value.trim(),
+      color: safeColor($("office-color").value),
+      logo: state.logo,
+      practice:
+        $("practice").value === "generic"
+          ? $("practice-label").value.trim()
+          : template.practice || $("practice").value,
+      crew: template.crew,
+      gates: template.gates,
+      rules: template.rules,
+    });
+    registerWorkspace(workspace);
+    if (epoch !== state.epoch) return;
+    state.workspace = workspace;
+    state.selectedId = workspace.id;
+    state.draftId = "";
+    renderSelector();
+    renderWorkspace();
+    notice("Your office is ready. Choose a desk and prepare a draft.");
+    $("draft-brief").focus();
+  } catch (error) {
+    if (epoch === state.epoch) notice(error.message, true);
+  } finally {
+    button.disabled = !state.template;
+  }
+});
+$("draft-agent").addEventListener("change", updateAgent);
+$("draft-provider").addEventListener("change", updateProviderNote);
+$("route-provider").addEventListener("change", () => renderRouteModels());
+$("route-model").addEventListener("change", () =>
+  renderRouteModels($("route-model").value),
+);
+$("save-route").addEventListener("click", () => {
+  const agent = selectedAgent();
+  if (!agent) return;
+  const provider = $("route-provider").value;
+  const model = provider === "demo" ? "" : $("route-model").value;
+  if (!canSaveRoute(state.providers.find((p) => p.id === provider), model)) {
+    notice(
+      "Choose a host-allowed model or Local demo.",
+      true,
+    );
+    return;
+  }
+  mutateWorkspace("/agents/route", { agent: agent.name, provider, model }, () =>
+    notice(
+      "Saved desk route for " +
+        agent.name +
+        ". No draft or outside action was performed.",
+    ),
+  );
+});
+$("draft-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const brief = $("draft-brief").value.trim();
+  const override = $("draft-provider").value === "demo";
+  const route = override ? { provider: "demo", model: "" } : savedRoute();
+  const info = routeInfo(route);
+  const provider = route.provider;
+  const agent = $("draft-agent").value;
+  if (!info.available) {
+    notice(
+      "This route is unavailable. Choose Local demo or update Desk settings.",
+      true,
+    );
+    return;
+  }
+  if (!brief) {
+    $("draft-brief").focus();
+    return;
+  }
+  mutateWorkspace(
+    "/drafts",
+    { provider, model: info.model, agent, brief },
+    (workspace) => {
+      state.draftId = workspace.drafts.at(-1)?.id || "";
+      if (override && $("draft-agent").value === agent)
+        $("draft-provider").value = "route";
+      notice(
+        provider === "demo"
+          ? "Simulated draft prepared. Review the text at your table."
+          : "Draft prepared. Review the text at your table.",
+      );
+    },
+  );
+});
+$("boardroom").addEventListener("click", () => {
+  $("review-panel").scrollIntoView({
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+    block: "start",
+  });
+  $("review-panel").focus({ preventScroll: true });
+});
+for (const [id, decision] of [
+  ["approve-draft", "approved"],
+  ["decline-draft", "declined"],
+])
+  $(id).addEventListener("click", () => {
+    if (state.draftId)
+      mutateWorkspace(
+        `/drafts/${encodeURIComponent(state.draftId)}/decision`,
+        { decision },
+        () =>
+          notice(
+            decision === "approved"
+              ? "Approval recorded. No outside action was performed."
+              : "Draft declined. No outside action was performed.",
+          ),
+      );
+  });
+$("show-add-agent").addEventListener("click", () => {
+  $("add-agent-form").hidden = false;
+  $("show-add-agent").hidden = true;
+  $("agent-name").focus();
+});
+$("cancel-add-agent").addEventListener("click", () => {
+  $("add-agent-form").hidden = true;
+  $("show-add-agent").hidden = false;
+});
+$("add-agent-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  mutateWorkspace(
+    "/agents",
+    {
+      name: $("agent-name").value.trim(),
+      specialty: $("agent-specialty").value.trim(),
+      instruction: $("agent-instruction").value.trim(),
+    },
+    () => {
+      $("add-agent-form").reset();
+      $("add-agent-form").hidden = true;
+      $("show-add-agent").hidden = false;
+      notice("New desk added. Choose it to prepare a brief.");
+    },
+  );
+});
+
+async function initialize() {
+  loadTemplate();
+  const results = await Promise.allSettled([
+    api("/api/workspaces"),
+    api("/api/providers"),
+  ]);
+  if (results[0].status === "fulfilled") {
+    // A locally created office can finish before this initial list request.
+    const offices = new Map(
+      (results[0].value.workspaces || []).map((office) => [office.id, office]),
+    );
+    for (const office of state.workspaces) offices.set(office.id, office);
+    state.workspaces = [...offices.values()];
+    renderSelector();
+  } else
+    notice(
+      "The local server is unavailable. Start it, then reload this page.",
+      true,
+    );
+  if (results[1].status === "fulfilled")
+    state.providers = results[1].value.providers || [];
+  else {
+    state.providers = [];
+    notice(
+      "Provider settings could not be loaded. Reload once the local server is ready.",
+      true,
+    );
+  }
+  renderProviders();
+  const savedOffice = /^#office\/([0-9a-f]{32})$/.exec(location.hash)?.[1];
+  if (state.epoch === 0 && state.workspaces.some((w) => w.id === savedOffice))
+    await selectWorkspace(savedOffice);
+}
+initialize();

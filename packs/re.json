@@ -1,0 +1,176 @@
+{
+  "office": "Real estate office · Agent Office",
+  "practice": "Real estate",
+  "about": "Synthetic residential brokerage practice; demonstration only, no real listings.",
+  "people": "1 owner and 2 staff (synthetic)",
+  "hoursPerWeek": 8,
+  "feed": "simulated",
+  "privacy": "Normal business",
+  "systems": [
+    "Follow Up Boss",
+    "RealScout",
+    "NJMLS",
+    "Calendar"
+  ],
+  "answers": {
+    "What brings you here?": "Both",
+    "How quiet should this stay?": "Private only"
+  },
+  "crew": [
+    {
+      "name": "CRIMSON",
+      "specialty": "Chief of Staff",
+      "engine": "Claude",
+      "color": "crimson",
+      "style": "headset",
+      "systems": [
+        "Crew coordination",
+        "Durable memory",
+        "Goals & schedule",
+        "Approval gates"
+      ],
+      "instruction": "Run the real estate office: assign work across the lanes, keep memory and the schedule, and bring every gate to the owner prepared to one step (Any price, contract term or client email (final draft); Any email to a client; Any social post; Any price or listing change; Any signature request). Nothing sends on its own. Every email is approved as its final draft. Ads and bios say broker, buyer's agent or seller's agent only."
+    },
+    {
+      "name": "AUTOMATIONS",
+      "specialty": "Lead Intake & Follow-up",
+      "engine": "Claude",
+      "color": "azure",
+      "style": "robot",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Takes in every new lead and drafts the personal follow-up for your approval. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "CLOSER",
+      "specialty": "Transactions",
+      "engine": "Claude",
+      "color": "indigo",
+      "style": "vest",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Prepares listing agreements, disclosures and contracts from the property packet. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "BUILDER",
+      "specialty": "Websites & Pages",
+      "engine": "Claude",
+      "color": "orange",
+      "style": "site",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Builds each property page and the listing set from one verified packet. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "PUBLISHER",
+      "specialty": "Content & Publishing",
+      "engine": "Claude",
+      "color": "plum",
+      "style": "press",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Writes and prepares posts, articles and reels for your yes. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "SCOUT",
+      "specialty": "Visibility & Market Intel",
+      "engine": "Claude",
+      "color": "lime",
+      "style": "field",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Measures and fixes your public presence: rankings, reviews, profiles. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "STRATEGIST",
+      "specialty": "Strategy & Positioning",
+      "engine": "Claude",
+      "color": "teal",
+      "style": "blazer",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Sets positioning and priorities; hands the plan to the crew and publishes nothing. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "ANALYST",
+      "specialty": "Finance",
+      "engine": "Claude",
+      "color": "green",
+      "style": "vest",
+      "systems": [
+        "Follow Up Boss",
+        "RealScout",
+        "NJMLS",
+        "Calendar"
+      ],
+      "instruction": "Finance only: reconciles accounts and flags anything odd. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    }
+  ],
+  "gates": [
+    {
+      "owner": "CRIMSON",
+      "need": "Any price, contract term or client email (final draft)",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any email to a client",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any social post",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any price or listing change",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any signature request",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    }
+  ],
+  "rules": "Nothing sends on its own. Every email is approved as its final draft. Ads and bios say broker, buyer's agent or seller's agent only."
+}

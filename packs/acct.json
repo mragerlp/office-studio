@@ -1,0 +1,155 @@
+{
+  "office": "Accounting office · Agent Office",
+  "practice": "Accounting",
+  "about": "Synthetic tax and bookkeeping practice; demonstration only, no real records.",
+  "people": "1 CPA and 2 staff (synthetic)",
+  "hoursPerWeek": 12,
+  "feed": "simulated",
+  "privacy": "Regulated by law",
+  "systems": [
+    "QuickBooks",
+    "Karbon",
+    "Outlook"
+  ],
+  "answers": {
+    "Your work mix": "Individual tax, Business tax, Bookkeeping",
+    "How hard is tax season?": "Busy"
+  },
+  "crew": [
+    {
+      "name": "CRIMSON",
+      "specialty": "Chief of Staff",
+      "engine": "Claude",
+      "color": "crimson",
+      "style": "headset",
+      "systems": [
+        "Crew coordination",
+        "Durable memory",
+        "Goals & schedule",
+        "Approval gates"
+      ],
+      "instruction": "Run the accounting office: assign work across the lanes, keep memory and the schedule, and bring every gate to the owner prepared to one step (Any tax position or filing decision: CPA only; Any return or filing; Any client message; Adjustments to the books; Any invoice). A CPA reviews every return, adjustment and client message. Tax information is used only with the client's written consent."
+    },
+    {
+      "name": "CHASER",
+      "specialty": "Document Collection",
+      "engine": "Claude",
+      "color": "orange",
+      "style": "press",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Sends friendly reminders for missing forms and tracks what arrived. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "BOOKKEEPER",
+      "specialty": "Bookkeeping",
+      "engine": "Claude",
+      "color": "green",
+      "style": "vest",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Sorts transactions and flags anything that needs a CPA. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "DEADLINES",
+      "specialty": "Deadlines",
+      "engine": "Claude",
+      "color": "teal",
+      "style": "blazer",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Tracks every due date per client. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "ONBOARDING",
+      "specialty": "Onboarding",
+      "engine": "Claude",
+      "color": "azure",
+      "style": "headset",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Prepares engagement letters and welcome packets. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "INBOX",
+      "specialty": "Client Inbox",
+      "engine": "Claude",
+      "color": "plum",
+      "style": "press",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Drafts answers for you to check. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "BILLING",
+      "specialty": "Billing",
+      "engine": "Claude",
+      "color": "indigo",
+      "style": "robot",
+      "systems": [
+        "QuickBooks",
+        "Karbon",
+        "Outlook"
+      ],
+      "instruction": "Prepares invoices and reminders. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    }
+  ],
+  "gates": [
+    {
+      "owner": "CRIMSON",
+      "need": "Any tax position or filing decision: CPA only",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any return or filing",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any client message",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Adjustments to the books",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any invoice",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    }
+  ],
+  "rules": "A CPA reviews every return, adjustment and client message. Tax information is used only with the client's written consent."
+}

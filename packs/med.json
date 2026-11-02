@@ -1,0 +1,155 @@
+{
+  "office": "Practice office · Agent Office",
+  "practice": "Medical practice",
+  "about": "Synthetic outpatient practice; demonstration only, no patient data.",
+  "people": "2 clinicians and 3 administrative staff (synthetic)",
+  "hoursPerWeek": 10,
+  "feed": "simulated",
+  "privacy": "Regulated by law",
+  "systems": [
+    "Epic",
+    "Phone system",
+    "Calendar"
+  ],
+  "answers": {
+    "Practice type": "General outpatient administration (synthetic)",
+    "Will your vendors sign a BAA?": "Yes, we require it"
+  },
+  "crew": [
+    {
+      "name": "CRIMSON",
+      "specialty": "Chief of Staff",
+      "engine": "Claude",
+      "color": "crimson",
+      "style": "headset",
+      "systems": [
+        "Crew coordination",
+        "Durable memory",
+        "Goals & schedule",
+        "Approval gates"
+      ],
+      "instruction": "Run the practice office: assign work across the lanes, keep memory and the schedule, and bring every gate to the owner prepared to one step (Anything clinical (treatment, dosing, who should get it): clinician only; Any patient message; Schedule changes more than a day out; Insurance submissions; Review requests). Admin help only, never clinical decisions. Patient information stays inside HIPAA-covered systems, and the office shows counts only."
+    },
+    {
+      "name": "FRONT DESK",
+      "specialty": "Scheduling",
+      "engine": "Claude",
+      "color": "azure",
+      "style": "headset",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Fills openings and handles reschedules. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "REMINDERS",
+      "specialty": "Appointment Reminders",
+      "engine": "Claude",
+      "color": "teal",
+      "style": "robot",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Sends reminders you've approved. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "INSURANCE",
+      "specialty": "Eligibility Checks",
+      "engine": "Claude",
+      "color": "indigo",
+      "style": "vest",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Confirms coverage ahead of each visit. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "FORMS",
+      "specialty": "Patient Forms",
+      "engine": "Claude",
+      "color": "orange",
+      "style": "press",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Collects intake forms before arrival. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "REVIEWS",
+      "specialty": "Reviews",
+      "engine": "Claude",
+      "color": "lime",
+      "style": "field",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Polite review requests after visits. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    },
+    {
+      "name": "PHONES",
+      "specialty": "Phones",
+      "engine": "Claude",
+      "color": "plum",
+      "style": "press",
+      "systems": [
+        "Epic",
+        "Phone system",
+        "Calendar"
+      ],
+      "instruction": "Sorts messages for staff to return. Work only in this lane and hand everything else to CRIMSON. Anything leaving the office goes through a gate."
+    }
+  ],
+  "gates": [
+    {
+      "owner": "CRIMSON",
+      "need": "Anything clinical (treatment, dosing, who should get it): clinician only",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Any patient message",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Schedule changes more than a day out",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Insurance submissions",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    },
+    {
+      "owner": "CRIMSON",
+      "need": "Review requests",
+      "brief": {
+        "action": "Prepared to one step by CRIMSON. Nothing is sent or clicked for you; the last step is yours.",
+        "ifDecline": "Held in CRIMSON's panel."
+      }
+    }
+  ],
+  "rules": "Admin help only, never clinical decisions. Patient information stays inside HIPAA-covered systems, and the office shows counts only."
+}
