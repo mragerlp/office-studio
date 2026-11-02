@@ -14,6 +14,7 @@ The 31-second reel follows a fictional business in the public app. It plays sile
 | Profile picture | [Ampersand avatar](office-suite-avatar.png) | 1080 × 1080 |
 | Logo on a light background | [Vector](office-suite-wordmark.svg) · [Transparent PNG](office-suite-wordmark.png) | Scalable · 2048 × 360 |
 | Reel | [MP4](create-office-reel.mp4) | 1080 × 1920 |
+| Widescreen presentation for a meeting | [MP4](create-office-presentation.mp4) | 1920 × 1080 |
 
 ## Caption
 
