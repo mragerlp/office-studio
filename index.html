@@ -5,29 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f5f3ed" />
     <title>Office Studio</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23285b53%27/%3E%3Cpath d=%27M32 12 52 32 32 52 12 32Z%27 fill=%27none%27 stroke=%27%23fffefa%27 stroke-width=%274%27/%3E%3C/svg%3E"
-    />
+    <link rel="icon" href="/assets/ampersand.svg" />
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
   </head>
   <body>
     <header class="masthead">
-      <a class="wordmark" href="/" aria-label="Office Studio home"
-        ><span class="brand-symbol" aria-hidden="true">◈</span> Office
-        <strong>Studio</strong
-        ><span class="local-label">LOCAL OFFICE SUITES</span></a
-      >
-      <div class="office-switch">
-        <a
-          id="help-link"
-          class="masthead-help"
-          href="/help.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Help ↗</a
+      <div class="studio-brand">
+        <button
+          type="button"
+          id="review-mark"
+          class="review-mark"
+          data-pending="0"
+          aria-label="Beyder &amp; Co. ampersand"
+          title="Beyder &amp; Co. ampersand"
+          disabled
         >
+          <span class="brand-symbol" aria-hidden="true"></span>
+        </button>
+        <a class="wordmark" href="/" aria-label="Office Studio home"
+          >Office <strong>Studio</strong
+          ><span class="local-label">LOCAL OFFICE SUITES</span></a
+        >
+      </div>
+      <div class="office-switch">
         <label for="workspace-select" class="sr-only"
           >Current Office Suite</label
         ><select id="workspace-select">
@@ -147,6 +148,10 @@
             class="template-preview"
             aria-live="polite"
           ></div>
+          <p class="field-note">
+            The setup count includes a dedicated LEGAL desk. The limit is 10
+            desks in total. Existing offices are unchanged.
+          </p>
           <details class="import-details">
             <summary>Already have an intake JSON?</summary>
             <label for="import-pack">Import a practice pack</label
@@ -565,20 +570,45 @@
         </div>
       </section>
     </main>
-    <dialog id="field-manual" class="paper manual-dialog" aria-labelledby="field-manual-title">
+    <dialog
+      id="field-manual"
+      class="paper manual-dialog"
+      aria-labelledby="field-manual-title"
+    >
       <p class="eyebrow">THE FIELD</p>
       <h2 id="field-manual-title">Office reference</h2>
       <p class="field-note" id="field-manual-note"></p>
       <div class="button-row">
-        <a id="field-manual-link" class="button primary" target="_blank" rel="noopener noreferrer" hidden>Company manual ↗</a>
-        <a class="button quiet" href="/help.html" target="_blank" rel="noopener noreferrer">Office Studio help ↗</a>
-        <button class="button quiet" type="button" id="close-field-manual">Back to room</button>
+        <a
+          id="field-manual-link"
+          class="button primary"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+          >Company manual ↗</a
+        >
+        <a
+          class="button quiet"
+          href="/help.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Offline app guide ↗</a
+        >
+        <button class="button quiet" type="button" id="close-field-manual">
+          Back to room
+        </button>
       </div>
     </dialog>
     <footer>
-      <span>Office Studio</span>
+      <span
+        >Office Studio
+        <small>· Original office concept by Beyder &amp; Co.</small></span
+      >
       <p>Workspaces and decisions are saved on this computer.</p>
-      <span>LOCAL EDITION / 01</span>
+      <div class="footer-tools">
+        <span>LOCAL EDITION / 01</span>
+        <a id="help-link" href="https://manual.beyderco.com/" target="_blank" rel="noopener noreferrer" aria-label="Help — Beyder &amp; Co. knowledge base (opens in a new tab)">Help ↗</a>
+      </div>
     </footer>
   </body>
 </html>

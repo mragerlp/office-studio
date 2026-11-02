@@ -94,7 +94,7 @@ class RoomPreviewTests(unittest.TestCase):
             frame = self.room(item)
             self.assertIsNotNone(frame, key)
             exported = self.request(f"/packs/{item['id']}.json", port=frame.port)[1]
-            self.assertEqual([a["name"] for a in exported["crew"]], [a["name"] for a in pack["crew"]])
+            self.assertEqual([a["name"] for a in exported["crew"]], [a["name"] for a in pack["crew"]] + ["LEGAL"])
             self.assertEqual(exported["rules"], pack["rules"])
         item = self.create(gates=[{"owner": "CRIMSON", "need": "Review fictional item", "brief": {}}])
         frame = self.room(item)
@@ -137,6 +137,8 @@ class RoomPreviewTests(unittest.TestCase):
         _, _, parent_headers = self.request("/", headers={"Host": f"localhost:{self.httpd.server_port}"})
         self.assertIn(f"frame-src http://localhost:{frame.port}", parent_headers["Content-Security-Policy"])
         self.assertEqual(parent_headers["Permissions-Policy"], f'screen-wake-lock=(self "http://localhost:{frame.port}")')
+        raw = self.request(frame.path + "?" + frame.query, port=frame.port, headers={"Host": f"localhost:{frame.port}"})[1]
+        self.assertEqual(self.presentation(raw)["studioOrigin"], f"http://localhost:{self.httpd.server_port}")
 
     @staticmethod
     def presentation(html):
@@ -159,8 +161,14 @@ class RoomPreviewTests(unittest.TestCase):
         frame = self.room(item)
         data = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
         self.assertEqual(data["agents"], [{"agent": "CRIMSON", "title": "Head Executive", "color": "#123456"},
-                                          {"agent": "HOST", "title": "Guest Relations", "color": "#abcdef"}])
+                                          {"agent": "HOST", "title": "Guest Relations", "color": "#abcdef"},
+                                          {"agent": "LEGAL", "title": "Legal Review", "color": ""}])
         self.assertEqual(self.request(f"/packs/{item['id']}.json", port=frame.port)[1]["crew"][1]["name"], "HOST")
+        status, customized, _ = self.request(base + "/agents/appearance", method="POST", body={"agent": "LEGAL", "title": "Counsel Liaison"})
+        self.assertEqual(status, 200)
+        themed = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
+        self.assertEqual(next(a for a in themed["agents"] if a["agent"] == "LEGAL")["title"], "Counsel Liaison")
+        self.assertEqual(next(a for a in customized["crew"] if a["name"] == "LEGAL")["name"], "LEGAL")
         status, reset, _ = self.request(base + "/agents/appearance", method="POST", body={"agent": "HOST"})
         self.assertEqual(status, 200)
         self.assertEqual(reset["crew"][1]["appearance"], {"title": "", "color": ""})
@@ -186,7 +194,8 @@ class RoomPreviewTests(unittest.TestCase):
         frame = self.room(item)
         raw = self.request(frame.path + "?" + frame.query, port=frame.port)[1]
         data = self.presentation(raw)
-        self.assertEqual(set(data), {"name", "color", "logo", "agents"})
+        self.assertEqual(set(data), {"name", "color", "logo", "agents", "studioOrigin"})
+        self.assertEqual(data["studioOrigin"], f"http://127.0.0.1:{self.httpd.server_port}")
         self.assertEqual(data["name"], malicious)
         self.assertEqual(data["agents"][0]["title"], title)
         self.assertEqual(data["logo"], "")

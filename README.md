@@ -2,9 +2,26 @@
 
 Office Studio is a local web app for your business's crew. Give the Head Executive a brief for the morning meeting, or ask a specialist to draft a client update. Each desk can use a different model. The owner reviews the draft and records a decision in the boardroom.
 
-![Office Studio's desk floor and approval inbox, using a fictional restaurant and simulated draft](docs/boardroom.png)
+The original office concept and signature ampersand come from **Beyder & Co.** The mark takes on the business's accent color and pulses when a draft needs the owner's review. The business keeps its own name and logo.
 
-_The Desks & drafts view, shown with a fictional restaurant and simulated output._
+[Run the app](#start-locally) · [Set up a coding agent](#development)
+
+### 1. Set up the office
+
+![Hudson Table setup with the office name, business template and brand accent](docs/setup.png)
+
+### 2. Step inside the Office Suite
+
+![The same Hudson Table crew inside the 3D office, with desks, room navigation and the Head Executive](docs/office-interior.png)
+
+With the owner's compatible room installed, **Create office** opens the tower in **Overview**. The **Desks** camera above shows the crew inside. This screenshot is shared with the room owner's permission. The private 3D artwork is supplied separately.
+
+<details>
+<summary>See the saved desks, drafts and approval inbox</summary>
+
+![Hudson Table in Desks & drafts, with a simulated draft waiting for review](docs/boardroom.png)
+
+</details>
 
 ## Start locally
 
@@ -24,7 +41,7 @@ The launcher prefers the [local address on port 8765](http://127.0.0.1:8765). It
 
 1. **Create an office.** Add a name, optional town/service area, accent color, and optional PNG/JPEG/WebP logo. Choose a practice template or enter your own industry, such as a restaurant.
    If the owner has supplied a compatible room file, the new office opens in the 3D tower's **Overview** with its selected crew. Otherwise it opens directly to **Desks & drafts**.
-2. **Choose a desk.** Each agent has a specialty and instructions. Open **Desk settings** to change its display title and color or select its provider and model. The lead desk starts as **Head Executive** and uses your business accent and optional logo. Add agents as needed, up to ten desks per office.
+2. **Choose a desk.** Each agent has a specialty and instructions. Every new office reserves one of its ten seats for **Legal Review**, which prepares questions and drafts for the owner or qualified counsel. Open **Desk settings** to change a display title, color, provider or model. The lead desk starts as **Head Executive** and uses your business accent and optional logo.
 3. **Prepare a draft.** Write a synthetic brief. The desk uses its saved provider and model by default. Choose **Local demo · this draft only** to rehearse the workflow offline. The inbox records how each draft was generated.
 4. **Review the text.** Approve or decline the draft in the inbox. The decision is saved locally. Sending a message or changing a business record remains a separate owner action.
 
@@ -32,7 +49,7 @@ Starter crews cover general business, real estate, law, accounting, financial ad
 
 The optional **Find town on map** link opens an OpenStreetMap search only when clicked. It does not establish an exact location or fetch a map during setup.
 
-**Help** opens the bundled product guide, even offline. Under **Office rules & approval gates**, save a company-specific HTTPS operating-manual link. It is available from the workspace header and from **The Field** in a compatible room. The app opens the manual on request. It does not crawl the site or give model providers its contents.
+**Help** at the end of the page opens the [Beyder & Co. knowledge base](https://manual.beyderco.com/) when clicked. The [bundled app guide](help.html) is also available offline. Under **Office rules & approval gates**, save a company-specific HTTPS operating-manual link. It is available from the workspace header and from **The Field** in a compatible room. The app opens the manual on request. It does not crawl the site or give model providers its contents.
 
 ## Optional private 3D room
 
@@ -75,6 +92,8 @@ Packaging writes the source edition to `dist/office-studio.zip` from an explicit
 
 ## Development
 
+For your first contribution, start with the [shared agent guide](AGENTS.md). There are short entry guides for [Muse Code](MUSE.md), [Gemini CLI](GEMINI.md), [Claude Code](CLAUDE.md), and [Codex or ChatGPT](CODEX.md).
+
 Daily work targets `develop`, the default branch. Open feature pull requests into `develop`. Promote a tested revision to `main` through a separate release pull request after owner review. The **Check Office Studio** workflow tests and builds a public platform ZIP on Windows and macOS. [View workflow runs](https://github.com/mragerlp/office-studio/actions/workflows/check.yml).
 
 ## Direction
@@ -82,3 +101,5 @@ Daily work targets `develop`, the default branch. Open feature pull requests int
 The next spatial feature is a floor for each department. For example, an owner could enter the accounting floor, select a desk, and open its saved work. Department floors and placement at a verified geographic location are planned.
 
 A future voice interface would let the owner brief Crimson, review a proposed change to the office, and approve it. The current app accepts written briefs and saves per-desk model choices in **Desk settings**.
+
+The ampersand artwork uses the Old Standard bold glyph from [the upstream typeface](https://github.com/google/fonts/tree/a01f27e9f42b5afad05090256d0d809928d84cae/ofl/oldstandardtt), matching the silhouette used for the room sculpture. The [font license](assets/OFL-Old-Standard.txt) accompanies the artwork.

@@ -47,7 +47,7 @@ def check_binary(path, target):
 def build(target, output):
     check_platform(target)
     # Keep the data allowlist separate from the broader source handoff list.
-    assets = ["index.html", "help.html", "app.js", "style.css", "room_theme.js", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
+    assets = ["index.html", "help.html", "app.js", "style.css", "room_theme.js", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="office-freeze-") as scratch:
