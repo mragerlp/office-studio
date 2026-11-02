@@ -339,7 +339,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+        policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        preview = getattr(self.server, "room_preview", None)
+        if preview:
+            hostname = self.headers.get("Host", "").split(":", 1)[0].lower()
+            if hostname in ("127.0.0.1", "localhost"):
+                policy += f"; frame-src http://{hostname}:{preview.port}"
+                self.send_header("Permissions-Policy", f'screen-wake-lock=(self "http://{hostname}:{preview.port}")')
+        else:
+            policy += "; frame-src 'none'"
+        self.send_header("Content-Security-Policy", policy)
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
@@ -400,6 +409,14 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         store = self.server.store
         if self.command in ("GET", "HEAD"):
+            room = re.fullmatch(rf"/api/workspaces/({ID})/room", path)
+            if room:
+                with store.connection() as db:
+                    item = store.get(db, room[1])
+                preview = self.server.room_preview
+                hostname = self.headers["Host"].split(":", 1)[0].lower()
+                self.json(200, {"url": preview.url(item, hostname) if preview else None})
+                return
             if path == "/api/providers":
                 self.json(200, {"providers": importlib.import_module("providers").list_providers()})
                 return
@@ -439,6 +456,23 @@ class Handler(BaseHTTPRequestHandler):
                     raise APIError("Workspace limit reached.", 409)
                 db.execute("INSERT INTO workspaces VALUES (?, ?, ?)", (item["id"], item["name"], json.dumps(item, ensure_ascii=False)))
             self.json(201, item)
+            return
+        appearance_match = re.fullmatch(rf"/api/workspaces/({ID})/agents/appearance", path)
+        if appearance_match:
+            fields(data, {"agent", "title", "color"})
+            name = text(data.get("agent", ""), "agent", 60, required=True, label=True)
+            appearance = {"title": text(data.get("title", ""), "title", 60, label=True),
+                          "color": text(data.get("color", ""), "color", 7, label=True)}
+            if appearance["color"] and not re.fullmatch(r"#[0-9A-Fa-f]{6}", appearance["color"]):
+                raise APIError("color must be empty or a six-digit hex color.")
+            with store.connection(write=True) as db:
+                item = store.get(db, appearance_match[1])
+                owner = next((a for a in item["crew"] if a["name"] == name), None)
+                if owner is None:
+                    raise APIError("Agent not found.", 404)
+                owner["appearance"] = appearance
+                store.save(db, item)
+            self.json(200, item)
             return
         route_match = re.fullmatch(rf"/api/workspaces/({ID})/agents/route", path)
         if route_match:
@@ -537,11 +571,36 @@ class Handler(BaseHTTPRequestHandler):
     do_GET = do_HEAD = do_POST = do_OPTIONS = do_PUT = do_DELETE = do_PATCH = handle_request
 
 
-def create_server(port=8765, data_dir=None):
+class StudioServer(ThreadingHTTPServer):
+    room_preview = None
+
+    def server_close(self):
+        if self.room_preview is not None:
+            self.room_preview.close()
+            self.room_preview = None
+        super().server_close()
+
+
+def create_server(port=8765, data_dir=None, room_file=None, room_port=0):
     """Construct a loopback server; port=0 is supported by in-process tests."""
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server = StudioServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
-    server.store = Store(data_dir if data_dir is not None else Path.home() / ".office-studio")
+    try:
+        server.store = Store(data_dir if data_dir is not None else Path.home() / ".office-studio")
+        if room_file is not None:
+            from room_preview import RoomPreview
+            def load_workspace(ident):
+                with server.store.connection() as db:
+                    try:
+                        return server.store.get(db, ident)
+                    except APIError as exc:
+                        if exc.status == 404:
+                            return None
+                        raise
+            server.room_preview = RoomPreview(room_file, load_workspace, server.server_port, room_port, check_logo=logo)
+    except Exception:
+        server.server_close()
+        raise
     return server
 
 
@@ -549,10 +608,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".office-studio")
+    parser.add_argument("--room-file", type=Path, help="Owner-supplied local HTML room; never copied into this application")
+    parser.add_argument("--room-port", type=int, default=0, help="Loopback room preview port (0 chooses a free port)")
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
-    server = create_server(args.port, args.data_dir)
+    if not 0 <= args.room_port <= 65535:
+        parser.error("--room-port must be between 0 and 65535")
+    try:
+        server = create_server(args.port, args.data_dir, args.room_file, args.room_port)
+    except (OSError, ValueError):
+        parser.error("The local server or room preview could not start. Check the requested file and ports.")
     print(f"Office Studio: http://127.0.0.1:{server.server_port}", flush=True)
     print("Workspace storage stays on this computer. Press Ctrl+C to stop.", flush=True)
     try:

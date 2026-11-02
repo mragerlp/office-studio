@@ -22,6 +22,9 @@ class DraftProvidersTest(unittest.TestCase):
             "openai": ("api.openai.com", "/v1/responses", {
                 "output": [{"type": "message", "content": [{"type": "output_text", "text": "Draft"}]}],
             }),
+            "meta": ("api.meta.ai", "/v1/chat/completions", {
+                "choices": [{"message": {"content": "Draft", "reasoning_content": "private reasoning"}}],
+            }),
             "anthropic": ("api.anthropic.com", "/v1/messages", {
                 "content": [{"type": "text", "text": "Draft"}],
             }),

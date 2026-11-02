@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 dist/
+build/
+private-room.html
 .env
 .env.*
 *.sqlite3*

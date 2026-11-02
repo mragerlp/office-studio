@@ -11,6 +11,7 @@ PROVIDERS = {
     "openai": ("OpenAI", "OPENAI_API_KEY", "OFFICE_OPENAI_MODEL"),
     "anthropic": ("Claude", "ANTHROPIC_API_KEY", "OFFICE_ANTHROPIC_MODEL"),
     "gemini": ("Gemini", "GEMINI_API_KEY", "OFFICE_GEMINI_MODEL"),
+    "meta": ("Meta Muse", "MODEL_API_KEY", "OFFICE_META_MODEL"),
 }
 
 
@@ -109,6 +110,12 @@ def generate_draft(provider, instruction, brief, model=None):
             }, {"model": model, "max_tokens": 1024, "system": system,
                 "messages": [{"role": "user", "content": brief}]})
             parts = [p["text"] for p in result["content"] if p.get("type") == "text"]
+        elif provider == "meta":
+            result = _post("api.meta.ai", "/v1/chat/completions", {"Authorization": f"Bearer {key}"}, {
+                "model": model, "max_completion_tokens": 1024,
+                "messages": [{"role": "developer", "content": system}, {"role": "user", "content": brief}],
+            })
+            parts = [result["choices"][0]["message"]["content"]]
         else:
             path = f"/v1beta/models/{quote(model, safe='')}:generateContent"
             result = _post("generativelanguage.googleapis.com", path, {"x-goog-api-key": key}, {

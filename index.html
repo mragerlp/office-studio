@@ -17,12 +17,13 @@
       <a class="wordmark" href="/" aria-label="Office Studio home"
         ><span class="brand-symbol" aria-hidden="true">◈</span> Office
         <strong>Studio</strong
-        ><span class="local-label">LOCAL WORKSPACE</span></a
+        ><span class="local-label">LOCAL OFFICE SUITES</span></a
       >
       <div class="office-switch">
-        <label for="workspace-select" class="sr-only">Current office</label
+        <label for="workspace-select" class="sr-only"
+          >Current Office Suite</label
         ><select id="workspace-select">
-          <option value="">Choose an office</option></select
+          <option value="">Choose an Office Suite</option></select
         ><button id="new-office" class="button quiet" type="button">
           + New office
         </button>
@@ -39,7 +40,7 @@
       <section id="setup" class="setup" aria-labelledby="setup-title">
         <div class="setup-intro">
           <p class="eyebrow">OFFICE SETUP</p>
-          <h1 id="setup-title">Build your<br />agent office.</h1>
+          <h1 id="setup-title">Build your<br />office.</h1>
           <p class="lede">
             Choose a crew for your business. Give a desk a brief, then review
             its draft in the boardroom.
@@ -61,9 +62,9 @@
           <div class="section-label">
             <span>THE FRONT DOOR</span><span>01 / SETUP</span>
           </div>
-          <h2>Create your office</h2>
+          <h2>Create your Office Suite</h2>
           <p class="muted">A few details make this space yours.</p>
-          <label for="office-name">Office name</label
+          <label for="office-name">Office Suite name</label
           ><input
             id="office-name"
             name="name"
@@ -90,6 +91,8 @@
                 <option value="acct">Accounting</option>
                 <option value="fin">Financial advisory</option>
                 <option value="med">Medical practice</option>
+                <option value="research">Scientific research</option>
+                <option value="biotech">Biotech</option>
               </select>
             </div>
             <div class="color-field">
@@ -161,7 +164,7 @@
           <div class="office-identity">
             <img id="workspace-logo" alt="" hidden />
             <div>
-              <p class="eyebrow">YOUR WORKING OFFICE</p>
+              <p class="eyebrow">YOUR OFFICE SUITE</p>
               <h1 id="workspace-title"></h1>
               <p id="workspace-town" class="muted"></p>
               <a
@@ -184,7 +187,59 @@
             Decisions stay yours.
           </div>
         </div>
-        <div class="workspace-grid">
+        <div class="workspace-views" aria-label="Office views">
+          <div class="view-buttons">
+            <button
+              id="view-room"
+              class="button quiet"
+              type="button"
+              aria-pressed="false"
+              aria-controls="room-stage"
+              disabled
+            >
+              3D office</button
+            ><button
+              id="view-desks"
+              class="button quiet"
+              type="button"
+              aria-pressed="true"
+              aria-controls="desk-workspace"
+            >
+              Desks &amp; drafts
+            </button>
+          </div>
+          <p id="room-availability" class="field-note" role="status">
+            Checking the optional local 3D room…
+          </p>
+        </div>
+        <section
+          id="room-stage"
+          class="paper room-stage"
+          aria-labelledby="room-title"
+          hidden
+        >
+          <div class="room-toolbar">
+            <div>
+              <p class="eyebrow">YOUR OFFICE · PRIVATE LOCAL VIEW</p>
+              <h2 id="room-title">Inside your office</h2>
+            </div>
+            <a
+              id="room-full-tab"
+              class="button quiet"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+              >Open room in full tab ↗</a
+            >
+          </div>
+          <div id="room-frames" class="room-frames"></div>
+          <p id="room-disclosure" class="room-disclosure">
+            Room activity is simulated. Use Desks &amp; drafts for saved drafts
+            and Studio decisions; actions inside this room do not record Studio
+            approvals.
+          </p>
+        </section>
+        <div id="desk-workspace" class="workspace-grid">
           <section class="paper office-room" aria-labelledby="crew-title">
             <div class="panel-heading">
               <div>
@@ -279,6 +334,54 @@
                     Desk settings <span id="saved-route-label"></span>
                   </summary>
                   <p id="route-agent" class="field-note"></p>
+                  <div class="appearance-settings">
+                    <label for="appearance-title"
+                      >Display title
+                      <span class="optional">optional</span></label
+                    >
+                    <input
+                      id="appearance-title"
+                      type="text"
+                      maxlength="100"
+                      placeholder="Use the desk’s default title"
+                    />
+                    <label for="appearance-color">Desk color</label>
+                    <div class="appearance-color-row">
+                      <input
+                        id="appearance-color"
+                        type="color"
+                        value="#285b53"
+                      /><label
+                        class="inline-check"
+                        for="appearance-default-color"
+                        ><input
+                          id="appearance-default-color"
+                          type="checkbox"
+                          checked
+                        />Use default color</label
+                      >
+                    </div>
+                    <p id="appearance-default-note" class="field-note"></p>
+                    <div class="button-row">
+                      <button
+                        id="save-appearance"
+                        class="button quiet"
+                        type="button"
+                      >
+                        Save appearance</button
+                      ><button
+                        id="reset-appearance"
+                        class="button quiet"
+                        type="button"
+                      >
+                        Reset defaults
+                      </button>
+                    </div>
+                    <p class="field-note">
+                      Titles and colors change the display. The agent’s stable
+                      name, provider route and draft ownership stay the same.
+                    </p>
+                  </div>
                   <label for="route-provider">Preferred provider</label>
                   <select id="route-provider"></select>
                   <label for="route-model">Preferred model</label>
@@ -315,6 +418,62 @@
                 Use synthetic briefs. Drafts are working text; review them
                 before use.
               </p>
+              <details class="provider-setup">
+                <summary>Configure providers on this desktop</summary>
+                <p>
+                  Local demo works immediately. Use the
+                  <strong>Configure Providers</strong> launcher to open the
+                  terminal setup wizard, then restart the local server. Keys
+                  belong in that setup flow, never in briefs or this browser.
+                </p>
+                <p>Provider documentation and advanced environment settings:</p>
+                <ul>
+                  <li>
+                    <a
+                      href="https://platform.openai.com/docs/quickstart"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >OpenAI</a
+                    >: <code>OPENAI_API_KEY</code> +
+                    <code>OFFICE_OPENAI_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://docs.anthropic.com/en/api/getting-started"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Claude</a
+                    >: <code>ANTHROPIC_API_KEY</code> +
+                    <code>OFFICE_ANTHROPIC_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://ai.google.dev/gemini-api/docs/api-key"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Gemini</a
+                    >: <code>GEMINI_API_KEY</code> +
+                    <code>OFFICE_GEMINI_MODEL</code>
+                  </li>
+                  <li>
+                    <a
+                      href="https://dev.meta.ai/docs/overview"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Meta Muse</a
+                    >: <code>MODEL_API_KEY</code> +
+                    <code>OFFICE_META_MODEL</code>
+                  </li>
+                </ul>
+                <p>
+                  Optional <code>OFFICE_OPENAI_MODELS</code>,
+                  <code>OFFICE_ANTHROPIC_MODELS</code>,
+                  <code>OFFICE_GEMINI_MODELS</code>, or
+                  <code>OFFICE_META_MODELS</code> adds comma-separated allowed
+                  models. Host configuration does not verify provider access.
+                  Consumer account sign-in is unavailable here.
+                </p>
+              </details>
             </section>
             <section
               id="review-panel"

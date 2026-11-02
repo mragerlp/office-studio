@@ -24,6 +24,9 @@ const state = {
   template: null,
   templateEpoch: 0,
   logo: "",
+  rooms: new Map(),
+  roomFrame: null,
+  roomFrameId: "",
 };
 const genericPack = {
   practice: "General business",
@@ -71,6 +74,176 @@ const genericPack = {
   rules:
     "Use synthetic information and placeholders. Prepare drafts only. The owner reviews every outside action; recording approval does not perform it.",
 };
+
+function buildSyntheticPack(practice, lanes, needs) {
+  const crew = [
+    structuredClone(genericPack.crew[0]),
+    ...lanes.map(([name, specialty, color, instruction]) => ({
+      name,
+      specialty,
+      color,
+      instruction:
+        instruction +
+        " Use synthetic placeholders only. Prepare drafts for owner review; do not take external actions.",
+    })),
+  ];
+  return {
+    practice,
+    crew,
+    gates: needs.map((need) => ({
+      owner: "CRIMSON",
+      need,
+      brief: {
+        action:
+          "Prepare an administrative draft for the owner. Record the decision only; the owner carries out any next step.",
+        ifDecline: "Keep the draft here for revision.",
+      },
+    })),
+    rules:
+      "Synthetic planning and administrative support only. Qualified owners review scientific, regulatory, product and spending decisions. No clinical decisions, experimental procedures, system changes, submissions or external communications are performed by this office.",
+  };
+}
+const localTemplates = {
+  generic: genericPack,
+  research: buildSyntheticPack(
+    "Scientific research",
+    [
+      [
+        "LITERATURE",
+        "Literature & source review",
+        "azure",
+        "Prepare a source-review outline and identify evidence gaps; do not invent findings or citations.",
+      ],
+      [
+        "PLANNING",
+        "Research planning support",
+        "teal",
+        "Draft high-level planning questions and review checklists without experimental procedures.",
+      ],
+      [
+        "EVIDENCE",
+        "Evidence register",
+        "green",
+        "Organize synthetic evidence-register headings and provenance questions for owner review.",
+      ],
+      [
+        "GRANTS",
+        "Grant administration",
+        "orange",
+        "Prepare a grant checklist and draft administrative milestones without submitting anything.",
+      ],
+      [
+        "EDITOR",
+        "Research communication",
+        "plum",
+        "Draft a clearly qualified research summary using supplied synthetic material; flag unverified claims.",
+      ],
+    ],
+    [
+      "Scientific claims and research-direction decisions: qualified owner only",
+      "Any publication, submission or external message: owner approval required",
+      "Any spending or data-access change: owner decision only",
+    ],
+  ),
+  biotech: buildSyntheticPack(
+    "Biotech",
+    [
+      [
+        "EVIDENCE",
+        "Evidence & provenance",
+        "azure",
+        "Prepare a synthetic evidence inventory and mark unsupported statements for review.",
+      ],
+      [
+        "PROGRAMS",
+        "Program coordination",
+        "teal",
+        "Draft a program-status outline and administrative handoff checklist.",
+      ],
+      [
+        "QUALITY",
+        "Quality documentation",
+        "green",
+        "Prepare document-control checklists and identify missing administrative records without certifying compliance.",
+      ],
+      [
+        "REGULATORY",
+        "Regulatory research support",
+        "indigo",
+        "Draft source questions and review checklists; do not give a regulatory determination or file submissions.",
+      ],
+      [
+        "PARTNERS",
+        "Partner communications",
+        "plum",
+        "Prepare a partner-update draft from synthetic placeholders without making product claims.",
+      ],
+    ],
+    [
+      "Scientific, regulatory and product decisions: qualified owner only",
+      "Any external communication or submission: owner approval required",
+      "Any spending, commitment or system change: owner decision only",
+    ],
+  ),
+};
+function isChief(agent) {
+  return agent?.name === "CRIMSON" || agent?.specialty === "Chief of Staff";
+}
+function defaultAgentTitle(agent) {
+  return isChief(agent)
+    ? "Head Executive"
+    : agent?.specialty || agent?.name || "Agent";
+}
+function agentAppearance(agent) {
+  return agent?.appearance || {};
+}
+function displayAgentTitle(agent) {
+  return (
+    agentAppearance(agent).title ||
+    agent?.displayTitle ||
+    agent?.title ||
+    defaultAgentTitle(agent)
+  );
+}
+function defaultAgentColor(agent, workspace = state.workspace) {
+  if (isChief(agent)) return safeColor(workspace?.color);
+  return (
+    palette[agent?.color] ||
+    (/^#[a-f\d]{6}$/i.test(agent?.color || "")
+      ? agent.color
+      : safeColor(workspace?.color))
+  );
+}
+function displayAgentColor(agent, workspace = state.workspace) {
+  const color = agentAppearance(agent).color;
+  return /^#[a-f\d]{6}$/i.test(color || "")
+    ? color
+    : defaultAgentColor(agent, workspace);
+}
+function agentDisplayLabel(name) {
+  const agent = state.workspace?.crew.find((item) => item.name === name);
+  return agent ? displayAgentTitle(agent) + " (" + name + ")" : name;
+}
+function renderAgentAppearance() {
+  const agent = selectedAgent();
+  const appearance = agentAppearance(agent);
+  $("appearance-title").value =
+    appearance.title || agent?.displayTitle || agent?.title || "";
+  $("appearance-title").placeholder = defaultAgentTitle(agent);
+  $("appearance-color").value = displayAgentColor(agent);
+  $("appearance-default-color").checked = !appearance.color;
+  $("appearance-color").disabled = !appearance.color;
+  $("appearance-default-note").textContent =
+    "Default: " +
+    defaultAgentTitle(agent) +
+    " · " +
+    defaultAgentColor(agent) +
+    (isChief(agent) && validLogo(state.workspace?.logo)
+      ? " · Office Suite logo avatar"
+      : "");
+  $("save-appearance").disabled = state.busy || !agent;
+  $("reset-appearance").disabled = state.busy || !agent;
+}
 
 async function api(path, body) {
   const response = await fetch(
@@ -168,11 +341,13 @@ function setBusy(value) {
     ? "Please wait…"
     : "Prepare draft ";
   updateProviderNote();
+  $("save-appearance").disabled = value || !selectedAgent();
+  $("reset-appearance").disabled = value || !selectedAgent();
   if (state.workspace) renderRouteModels($("route-model").value);
 }
 function renderSelector() {
   const select = $("workspace-select");
-  select.replaceChildren(option("", "Choose an office"));
+  select.replaceChildren(option("", "Choose an Office Suite"));
   for (const office of state.workspaces)
     select.append(option(office.id, office.name));
   select.value = state.selectedId;
@@ -252,10 +427,9 @@ async function loadTemplate() {
   renderTemplate();
   try {
     const key = $("practice").value;
-    const pack =
-      key === "generic"
-        ? structuredClone(genericPack)
-        : await api(`/packs/${encodeURIComponent(key)}.json`);
+    const pack = localTemplates[key]
+      ? structuredClone(localTemplates[key])
+      : await api(`/packs/${encodeURIComponent(key)}.json`);
     if (epoch !== state.templateEpoch) return;
     state.template = checkedPack(pack);
     renderTemplate();
@@ -275,6 +449,7 @@ async function loadTemplate() {
   }
 }
 function showSetup() {
+  releaseRoomFrame();
   resetWorkspaceForms();
   $("office-form").reset();
   clearLogo();
@@ -298,6 +473,7 @@ async function selectWorkspace(id) {
     return;
   }
   const epoch = ++state.epoch;
+  if (state.selectedId !== id) releaseRoomFrame();
   resetWorkspaceForms();
   state.selectedId = id;
   state.workspace = null;
@@ -363,7 +539,7 @@ function routeInfo(route) {
 function renderProviders() {
   const select = $("route-provider");
   select.replaceChildren();
-  const rank = { demo: 0, openai: 1, anthropic: 2, gemini: 3 };
+  const rank = { demo: 0, openai: 1, anthropic: 2, gemini: 3, meta: 4 };
   for (const provider of [...state.providers].sort(
     (a, b) => (rank[a.id] ?? 9) - (rank[b.id] ?? 9),
   )) {
@@ -464,10 +640,13 @@ function updateAgent() {
     state.deskKey = key;
     $("draft-provider").value = "route";
   }
-  $("agent-description").textContent = agent ? agent.specialty : "";
+  $("agent-description").textContent = agent
+    ? agent.name + " · " + agent.specialty
+    : "";
   for (const button of $("desks").children)
     button.setAttribute("aria-pressed", String(button.dataset.agent === name));
   renderDeskSettings();
+  renderAgentAppearance();
   updateProviderNote();
 }
 function draftRouteLabel(draft) {
@@ -476,6 +655,156 @@ function draftRouteLabel(draft) {
     : providerLabel(draft.provider) +
         (draft.model ? " / " + draft.model : " / model not recorded");
 }
+function roomSignature(workspace) {
+  return JSON.stringify([
+    workspace.name,
+    workspace.town,
+    workspace.color,
+    workspace.logo,
+    workspace.crew.map((agent) => [
+      agent.name,
+      agent.specialty,
+      agent.color,
+      agent.style,
+      displayAgentTitle(agent),
+      displayAgentColor(agent, workspace),
+    ]),
+  ]);
+}
+function localRoomURL(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" &&
+      ["127.0.0.1", "localhost"].includes(url.hostname) &&
+      url.hostname === location.hostname &&
+      url.origin !== location.origin &&
+      !url.username &&
+      !url.password
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+function displayOfficeView(entry) {
+  const ready = !!entry?.url;
+  const showRoom = ready && entry.view === "room";
+  $("view-room").disabled = !ready;
+  $("view-room").setAttribute("aria-pressed", String(showRoom));
+  $("view-desks").setAttribute("aria-pressed", String(!showRoom));
+  $("room-stage").hidden = !showRoom;
+  $("desk-workspace").hidden = showRoom;
+  $("room-full-tab").hidden = !ready;
+  if (ready) $("room-full-tab").href = entry.url;
+  else $("room-full-tab").removeAttribute("href");
+  $("room-availability").textContent = entry?.pending
+    ? "Checking the optional local 3D room…"
+    : ready
+      ? "Private local room · simulated activity"
+      : "3D room unavailable on this host. Desks & drafts are ready to use.";
+  for (const frame of $("room-frames").children)
+    frame.hidden = frame !== entry?.frame;
+}
+function chooseOfficeView(view) {
+  const entry = state.rooms.get(state.selectedId);
+  if (!entry || (view === "room" && !entry.url)) return;
+  entry.view = view;
+  entry.userChoice = true;
+  displayOfficeView(entry);
+}
+function releaseRoomFrame() {
+  if (!state.roomFrameId) return;
+  const entry = state.rooms.get(state.roomFrameId);
+  if (entry) entry.frame = null;
+  // Navigating away releases the previous office's renderer/WebGL context.
+  state.roomFrame.src = "about:blank";
+  state.roomFrame.hidden = true;
+  state.roomFrameId = "";
+}
+function ensureRoomFrame(entry, workspace, reload) {
+  if (!state.roomFrame) {
+    const frame = el("iframe", "embedded-room");
+    frame.setAttribute(
+      "sandbox",
+      "allow-scripts allow-same-origin allow-pointer-lock",
+    );
+    frame.setAttribute("referrerpolicy", "no-referrer");
+    frame.setAttribute("allow", "screen-wake-lock");
+    frame.setAttribute("aria-describedby", "room-disclosure");
+    frame.addEventListener("error", () => {
+      const current = state.rooms.get(state.roomFrameId);
+      if (!current || !isCurrent(state.roomFrameId, current.epoch)) return;
+      current.url = null;
+      current.view = "desks";
+      displayOfficeView(current);
+    });
+    state.roomFrame = frame;
+    $("room-frames").append(frame);
+  }
+  if (state.roomFrameId && state.roomFrameId !== workspace.id)
+    releaseRoomFrame();
+  state.roomFrameId = workspace.id;
+  entry.frame = state.roomFrame;
+  entry.frame.title = workspace.name + " · simulated 3D office";
+  if (reload || entry.frame.getAttribute("src") !== entry.url)
+    entry.frame.src = entry.url;
+}
+function syncOfficeRoom() {
+  const workspace = state.workspace;
+  if (!workspace) return;
+  const id = workspace.id,
+    epoch = state.epoch,
+    signature = roomSignature(workspace);
+  let entry = state.rooms.get(id);
+  if (entry && entry.signature === signature) {
+    entry.epoch = epoch;
+    if (entry.url && !entry.pending) ensureRoomFrame(entry, workspace, false);
+    displayOfficeView(entry);
+    if (entry.pending && entry.requestEpoch !== epoch)
+      requestOfficeRoom(entry, workspace, epoch, false);
+    return;
+  }
+  const reload = !!entry?.frame;
+  if (!entry)
+    entry = {
+      view: "desks",
+      userChoice: false,
+      url: null,
+      frame: null,
+      request: 0,
+    };
+  entry.signature = signature;
+  entry.epoch = epoch;
+  entry.pending = true;
+  state.rooms.set(id, entry);
+  displayOfficeView(entry);
+  requestOfficeRoom(entry, workspace, epoch, reload);
+}
+async function requestOfficeRoom(entry, workspace, epoch, reload) {
+  const id = workspace.id,
+    request = ++entry.request;
+  entry.requestEpoch = epoch;
+  try {
+    const result = await api(
+      "/api/workspaces/" + encodeURIComponent(id) + "/room",
+    );
+    if (entry.request !== request || state.rooms.get(id) !== entry) return;
+    entry.url = localRoomURL(result.url);
+    entry.pending = false;
+    if (entry.url && !entry.userChoice) entry.view = "room";
+    if (!isCurrent(id, epoch)) return;
+    if (entry.url) ensureRoomFrame(entry, workspace, reload);
+    displayOfficeView(entry);
+  } catch {
+    if (entry.request !== request || state.rooms.get(id) !== entry) return;
+    entry.pending = false;
+    entry.url = null;
+    entry.view = "desks";
+    if (isCurrent(id, epoch)) displayOfficeView(entry);
+  }
+}
+
 function renderWorkspace() {
   const workspace = state.workspace;
   if (!workspace) return;
@@ -508,16 +837,21 @@ function renderWorkspace() {
     desk.dataset.agent = agent.name;
     desk.setAttribute(
       "aria-label",
-      `${agent.name}, ${agent.specialty}. Prepare a brief.`,
+      `${displayAgentTitle(agent)}, ${agent.name}, ${agent.specialty}. Prepare a brief.`,
     );
-    desk.style.setProperty(
-      "--desk-color",
-      palette[agent.color] || safeColor(workspace.color),
-    );
+    desk.style.setProperty("--desk-color", displayAgentColor(agent, workspace));
+    const avatar = el("span", "desk-avatar");
+    if (isChief(agent) && validLogo(workspace.logo)) {
+      avatar.classList.add("has-logo");
+      const image = el("img");
+      image.src = workspace.logo;
+      image.alt = "";
+      avatar.append(image);
+    }
     desk.append(
-      el("span", "desk-avatar", ""),
-      el("strong", "", agent.name),
-      el("small", "", agent.specialty),
+      avatar,
+      el("strong", "", displayAgentTitle(agent)),
+      el("small", "", agent.name),
     );
     desk.addEventListener("click", () => {
       $("draft-agent").value = agent.name;
@@ -526,7 +860,7 @@ function renderWorkspace() {
     });
     $("desks").append(desk);
     $("draft-agent").append(
-      option(agent.name, `${agent.name} · ${agent.specialty}`),
+      option(agent.name, `${displayAgentTitle(agent)} · ${agent.name}`),
     );
   });
   if (workspace.crew.some((a) => a.name === previous))
@@ -539,8 +873,11 @@ function renderWorkspace() {
   $("office-rules").textContent = workspace.rules || "";
   $("office-gates").replaceChildren();
   for (const gate of workspace.gates || [])
-    $("office-gates").append(el("li", "", `${gate.owner} · ${gate.need}`));
+    $("office-gates").append(
+      el("li", "", `${agentDisplayLabel(gate.owner)} · ${gate.need}`),
+    );
   renderDrafts();
+  syncOfficeRoom();
 }
 function renderDrafts() {
   const drafts = state.workspace?.drafts || [];
@@ -571,7 +908,11 @@ function renderDrafts() {
     const copy = el("div");
     copy.append(
       el("strong", "", draft.brief),
-      el("small", "", `${draft.agent} · ${draftRouteLabel(draft)}`),
+      el(
+        "small",
+        "",
+        `${agentDisplayLabel(draft.agent)} · ${draftRouteLabel(draft)}`,
+      ),
     );
     item.append(copy, el("span", `state-pill ${draft.status}`, draft.status));
     item.addEventListener("click", () => {
@@ -593,7 +934,8 @@ function renderDrafts() {
   $("preview-provider").textContent =
     draft.provider === "demo" ? "SIMULATED DRAFT" : draftRouteLabel(draft);
   $("preview-brief").textContent = draft.brief;
-  $("preview-agent").textContent = `Prepared with ${draft.agent}`;
+  $("preview-agent").textContent =
+    `Prepared with ${agentDisplayLabel(draft.agent)}`;
   $("preview-text").textContent = draft.text;
   $("decision-buttons").hidden = draft.status !== "pending";
   $("decision-note").textContent =
@@ -625,6 +967,8 @@ async function mutateWorkspace(path, body, after) {
   }
 }
 
+$("view-room").addEventListener("click", () => chooseOfficeView("room"));
+$("view-desks").addEventListener("click", () => chooseOfficeView("desks"));
 $("new-office").addEventListener("click", showSetup);
 $("workspace-select").addEventListener("change", (event) =>
   selectWorkspace(event.target.value),
@@ -750,6 +1094,34 @@ $("office-form").addEventListener("submit", async (event) => {
     button.disabled = !state.template;
   }
 });
+$("appearance-default-color").addEventListener("change", () => {
+  $("appearance-color").disabled = $("appearance-default-color").checked;
+  if ($("appearance-default-color").checked)
+    $("appearance-color").value = defaultAgentColor(selectedAgent());
+});
+function saveAppearance(reset = false) {
+  const agent = selectedAgent();
+  if (!agent) return;
+  const title = reset ? "" : $("appearance-title").value.trim();
+  const color =
+    reset || $("appearance-default-color").checked
+      ? ""
+      : $("appearance-color").value;
+  mutateWorkspace(
+    "/agents/appearance",
+    { agent: agent.name, title, color },
+    () =>
+      notice(
+        "Display appearance " +
+          (reset ? "reset" : "saved") +
+          " for " +
+          agent.name +
+          ". Its name and provider route are unchanged.",
+      ),
+  );
+}
+$("save-appearance").addEventListener("click", () => saveAppearance());
+$("reset-appearance").addEventListener("click", () => saveAppearance(true));
 $("draft-agent").addEventListener("change", updateAgent);
 $("draft-provider").addEventListener("change", updateProviderNote);
 $("route-provider").addEventListener("change", () => renderRouteModels());
@@ -761,11 +1133,13 @@ $("save-route").addEventListener("click", () => {
   if (!agent) return;
   const provider = $("route-provider").value;
   const model = provider === "demo" ? "" : $("route-model").value;
-  if (!canSaveRoute(state.providers.find((p) => p.id === provider), model)) {
-    notice(
-      "Choose a host-allowed model or Local demo.",
-      true,
-    );
+  if (
+    !canSaveRoute(
+      state.providers.find((p) => p.id === provider),
+      model,
+    )
+  ) {
+    notice("Choose a host-allowed model or Local demo.", true);
     return;
   }
   mutateWorkspace("/agents/route", { agent: agent.name, provider, model }, () =>
