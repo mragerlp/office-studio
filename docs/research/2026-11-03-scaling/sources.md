@@ -19,6 +19,8 @@ Inspection was bounded to those source files and metadata. It does not establish
 
 - [LibreChat agents](https://www.librechat.ai/docs/features/agents), [file search](https://www.librechat.ai/docs/features/rag_api), [access controls](https://www.librechat.ai/docs/features/access_control).
 - [Dify Human Input](https://docs.dify.ai/en/cloud/use-dify/nodes/human-input), [model providers](https://docs.dify.ai/en/cloud/use-dify/workspace/model-providers). The provider page was reached through the official documentation navigation after an outdated path failed.
+- [Dust Microsoft connector scopes](https://docs.dust.tt/changelog/configurable-oauth-scopes-for-microsoft-mcp-tools). The dated vendor changelog describes admin-selected optional permissions.
+- [Copilot Studio connections](https://learn.microsoft.com/en-us/microsoft-copilot-studio/authoring-connections), [flows](https://learn.microsoft.com/en-us/microsoft-copilot-studio/flows-overview). Product capabilities are documented, not personally exercised in this comparison.
 - [n8n queue mode](https://docs.n8n.io/hosting/scaling/queue-mode/). Documented Redis/database/worker architecture is a pattern comparison, not a dependency selection.
 - [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence).
 - [LiteLLM virtual keys](https://docs.litellm.ai/docs/proxy/virtual_keys). Feature availability and hosting requirements need a version-specific evaluation before adoption.
