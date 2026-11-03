@@ -18,6 +18,10 @@ FILES = (
     "assets/ampersand.svg", "assets/OFL-Old-Standard.txt",
     "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt",
     "AGENTS.md", "MUSE.md", "GEMINI.md", "CLAUDE.md", "CODEX.md",
+    "macos/README.md", "macos/Project.xcconfig", "macos/build-runner.sh",
+    "macos/OfficeStudio/AppDelegate.swift", "macos/OfficeStudio.xcodeproj/project.pbxproj",
+    "macos/OfficeStudio.xcodeproj/xcshareddata/xcschemes/OfficeStudio.xcscheme",
+    "macos/tests/test_app.py", "script/build_and_run.sh",
     "packs/re.json", "packs/law.json", "packs/acct.json", "packs/fin.json", "packs/med.json",
     "hosted/README.md", "hosted/index.html", "hosted/style.css", "hosted/auth.js", "hosted/app.js",
     "hosted/room-client.js", "hosted/room-view.js", "hosted/build_site.py",
@@ -40,7 +44,7 @@ def add_file(bundle, source, name, *, executable=False):
 
 def build_package(output=None, runner=None, private_room=None):
     output = Path(output) if output is not None else ROOT / "dist" / "office-studio.zip"
-    sources = [(ROOT / name, name, name.endswith(".command")) for name in FILES]
+    sources = [(ROOT / name, name, name.endswith((".command", ".sh"))) for name in FILES]
     if runner is not None:
         runner = Path(runner)
         windows = runner.suffix.lower() == ".exe"

@@ -31,6 +31,8 @@ The [Office Suite media kit](https://github.com/mragerlp/office-studio/tree/deve
 
 **Using a packaged build:** Extract the complete ZIP for your operating system. Double-click **Start Office Studio.command** on an Apple Silicon Mac or **Start Office Studio.cmd** on Windows x64. The launcher starts the server and opens setup in your default browser. Keep its terminal window open while you work. The platform builds include their own runtime.
 
+**Native Mac app development:** Open [the Xcode project](macos/OfficeStudio.xcodeproj) and follow the [Mac build guide](macos/README.md) to build a double-clickable app.
+
 **Using source:** You need Python 3.10+ and a browser. The Python standard library serves the HTML, CSS, and JavaScript directly.
 
 Run the command for your system from the extracted or cloned `office-studio` directory.

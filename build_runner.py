@@ -46,7 +46,7 @@ def check_binary(path, target):
             raise RuntimeError("Expected an arm64 macOS runner.")
 
 
-def build(target, output):
+def build(target, output, signing_identity=None):
     check_platform(target)
     # Keep the data allowlist separate from the broader source handoff list.
     assets = ["index.html", "help.html", "app.js", "appearance.js", "style.css", "room_theme.js", "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
@@ -59,6 +59,8 @@ def build(target, output):
                    "--hidden-import", "room_preview"]
         if target == "macos-arm64":
             command.extend(["--target-arch", "arm64"])
+            if signing_identity:
+                command.extend(["--codesign-identity", signing_identity])
         for name in assets:
             command.extend(["--add-data", f"{ROOT / name}:{Path(name).parent.as_posix()}"])
         command.append(str(ROOT / "launch.py"))
@@ -215,9 +217,10 @@ def main():
     parser.add_argument("--target", required=True, choices=TARGETS)
     parser.add_argument("--output", type=Path, default=ROOT / "dist" / "native")
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--signing-identity", help="Existing macOS signing identity for the runner and its embedded libraries")
     args = parser.parse_args()
     if args.action == "build":
-        print(build(args.target, args.output))
+        print(build(args.target, args.output, args.signing_identity))
     elif args.archive is None:
         parser.error("smoke requires --archive")
     else:
