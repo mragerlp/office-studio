@@ -125,6 +125,8 @@ h3 {
   mask: url("/assets/ampersand.svg") center / contain no-repeat;
 }
 .review-mark[data-active="true"] { box-shadow: inset 0 -2px var(--accent); }
+.review-mark[data-executive-alert="true"] { box-shadow: inset 0 -2px #c01626; background: #fff7f6; }
+.review-mark[data-executive-alert="true"] .brand-symbol { background: #c01626; }
 @media (prefers-reduced-motion: no-preference) {
   .review-mark[data-active="true"] .brand-symbol { animation: amp-review 1.9s ease-in-out infinite; }
 }
@@ -1168,6 +1170,17 @@ footer > span:first-child {
 .room-stage {
   overflow: hidden;
 }
+.room-full-window { overflow: hidden; }
+.room-full-window .room-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+}
+.room-full-window .room-frames { flex: 1; min-height: 0; }
+.room-full-window .embedded-room { height: 100%; }
 .room-toolbar {
   padding: 18px 24px;
   display: flex;
@@ -1189,6 +1202,7 @@ footer > span:first-child {
   background: #e5e8e1;
   position: relative;
 }
+.room-frames:empty { min-height: clamp(580px, 72vh, 1000px); }
 .embedded-room {
   display: block;
   width: 100%;

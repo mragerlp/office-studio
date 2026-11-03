@@ -12,24 +12,46 @@
   const choices = new Map();
   const suppliedAgents = new Map(presentation.agents.filter(item => item && typeof item.agent === "string" &&
     typeof item.title === "string").map(item => [item.agent, item]));
+  const executiveInfo = [...suppliedAgents.values()].some(item => typeof item.executive === "boolean");
+  const executiveAliases = new Set([...suppliedAgents.values()]
+    .filter(item => executiveInfo ? item.executive === true : item.agent === "CRIMSON")
+    .map(item => item.agent));
+  const executiveIds = new Set(executiveInfo ? [] : ["crimson"]);
   const knownIds = new Map();
-  let office, attempts = 0, queued = false, ownerReviewPending = false, reviewSculpture = null;
+  let office, attempts = 0, queued = false, ownerReviewPending = false, ownerExecutivePending = false,
+    reviewSculpture = null, refreshSculptureAlert = null;
+
+  function nativeExecutivePending() {
+    const state = office && office.OFFICE_STATE;
+    // Seeded simulated gates are still visible approvals for the executive.
+    // Display titles/statuses are presentation and are not ownership sensors.
+    return Array.isArray(state && state.approvals) && state.approvals.some(gate => executiveIds.has(gate.agentId));
+  }
 
   function markReviewSignal() {
     if (!reviewSculpture) return;
     reviewSculpture.group.userData.officeStudioReviewPending = ownerReviewPending;
+    reviewSculpture.group.userData.officeStudioExecutivePending = ownerExecutivePending;
     document.documentElement.dataset.officeReviewPending = String(ownerReviewPending);
+    document.documentElement.dataset.officeExecutivePending = String(ownerExecutivePending);
+    if (refreshSculptureAlert) refreshSculptureAlert();
   }
 
-  // Only a boolean from this frame's exact Studio parent is accepted. It is
-  // independent of native simulated gates and carries no draft or agent data.
+  // Only review booleans from the exact Studio parent are accepted. The old
+  // two-key payload remains generic attention; it never invents an executive
+  // approval. Neither payload carries drafts, IDs, instructions or credentials.
   if (window.parent !== window && typeof window.addEventListener === "function") {
     window.addEventListener("message", event => {
       const data = event.data;
       if (event.source !== window.parent || event.origin !== presentation.studioOrigin ||
-          !data || typeof data !== "object" || Array.isArray(data) || Object.keys(data).length !== 2 ||
-          data.type !== "office-studio:review-signal" || typeof data.pending !== "boolean") return;
+          !data || typeof data !== "object" || Array.isArray(data)) return;
+      const keys = Object.keys(data);
+      const legacy = keys.length === 2 && keys.includes("type") && keys.includes("pending");
+      const current = keys.length === 3 && keys.includes("type") && keys.includes("pending") &&
+        keys.includes("executivePending") && typeof data.executivePending === "boolean";
+      if ((!legacy && !current) || data.type !== "office-studio:review-signal" || typeof data.pending !== "boolean") return;
       ownerReviewPending = data.pending;
+      ownerExecutivePending = current ? data.executivePending : false;
       markReviewSignal();
     });
   }
@@ -51,6 +73,7 @@
     // Do not change the display name here: the room still builds its gate
     // owner-name lookup immediately after publishing each add event.
     knownIds.set(supplied.agent, person.id);
+    if (executiveAliases.has(supplied.agent)) executiveIds.add(person.id);
     choices.set(person.id, choice);
     return choice;
   }
@@ -59,6 +82,7 @@
   // pack. Install once now, so Figure receives the owner's paint at birth.
   if (window.AgentOffice && typeof window.AgentOffice.on === "function") {
     window.AgentOffice.on("add", preparePaint);
+    window.AgentOffice.on("approval", markReviewSignal);
   }
 
   function logoImage(marker, label) {
@@ -76,7 +100,7 @@
     element.dataset.officeAgentBadge = id;
     element.setAttribute("aria-label", choice.title);
     if (choice.color) element.style.setProperty("--c", choice.color);
-    if (choice.agent === "CRIMSON" && logo && !element.querySelector("[data-office-chief-logo]")) {
+    if (executiveAliases.has(choice.agent) && logo && !element.querySelector("[data-office-chief-logo]")) {
       element.replaceChildren(logoImage("data-office-chief-logo", presentation.name + " · " + choice.title));
     }
   }
@@ -129,40 +153,66 @@
     if (!sculpture || !sculpture.group || !sculpture.base || !safeColor(presentation.color) ||
         !office.THREE || typeof office.THREE.Color !== "function") return;
     const base = sculpture.base;
-    const sum = base.r + base.g + base.b;
-    if (!(sum > 0) || typeof base.copy !== "function") return;
-    const tint = new office.THREE.Color(presentation.color).convertSRGBToLinear();
-    // Retint the existing dedicated sculpture materials, preserving their
-    // relative brightness. The native frame loop still owns every pulse,
-    // opacity and emissive intensity; no geometry or extra mark is created.
-    for (const name of ["lacquer", "haloMat", "topMat", "poolMat", "revealMat"]) {
-      const material = sculpture[name];
-      if (!material) continue;
-      for (const property of name === "lacquer" ? ["color", "emissive"] : ["color"]) {
-        const color = material[property];
-        if (!color || typeof color.copy !== "function" || typeof color.multiplyScalar !== "function") continue;
-        const gain = (color.r + color.g + color.b) / sum;
-        if (Number.isFinite(gain) && gain >= 0) color.copy(tint).multiplyScalar(gain);
+    if (!(base.r + base.g + base.b > 0) || typeof base.copy !== "function") return;
+    let painted = "", executiveAlert = false;
+    const gains = new Map();
+    function paint(hex) {
+      if (painted === hex) return;
+      const sum = base.r + base.g + base.b;
+      const tint = new office.THREE.Color(hex).convertSRGBToLinear();
+      // Retint dedicated materials only. Read current gains so the native
+      // reveal pulse retains its brightness when an alert changes tiers.
+      for (const name of ["lacquer", "haloMat", "topMat", "poolMat", "revealMat"]) {
+        const material = sculpture[name];
+        if (!material) continue;
+        for (const property of name === "lacquer" ? ["color", "emissive"] : ["color"]) {
+          const color = material[property];
+          if (!color || typeof color.copy !== "function" || typeof color.multiplyScalar !== "function") continue;
+          const gain = sum > 0 ? (color.r + color.g + color.b) / sum : gains.get(color);
+          if (Number.isFinite(gain) && gain >= 0) {
+            gains.set(color, gain);
+            color.copy(tint).multiplyScalar(gain);
+          }
+        }
       }
+      base.copy(tint);
+      painted = hex;
+      sculpture.group.userData.officeStudioAmpColor = hex;
+      document.documentElement.dataset.officeAmpColor = hex;
     }
-    base.copy(tint);
-    sculpture.group.userData.officeStudioAmpColor = presentation.color;
+    refreshSculptureAlert = () => {
+      const native = nativeExecutivePending();
+      const executive = native || ownerExecutivePending;
+      executiveAlert = executive;
+      sculpture.group.userData.officeStudioNativeExecutivePending = native;
+      sculpture.group.userData.officeStudioExecutiveAlert = executive;
+      document.documentElement.dataset.officeNativeExecutivePending = String(native);
+      document.documentElement.dataset.officeExecutiveAlert = String(executive);
+      paint(executive ? "#a70008" : presentation.color);
+      return executive;
+    };
+    sculpture.group.userData.officeStudioAmpBrandColor = presentation.color;
+    document.documentElement.dataset.officeAmpBrandColor = presentation.color;
     // The native loop remains the sole clock, including reduced-motion rules.
-    // Its writes retain the realIssues result; only reads combine that result
-    // with the parent's saved-review boolean, without inventing room gates.
+    // Its writes retain realIssues. Reads combine that result with actual
+    // executive approvals and the parent's saved-review flags, without gates.
     const fast = Object.getOwnPropertyDescriptor(sculpture, "fast");
     if (!fast || fast.configurable) {
       let nativeFast = Boolean(sculpture.fast);
       sculpture.group.userData.officeStudioNativeFast = nativeFast;
       Object.defineProperty(sculpture, "fast", {configurable: true, enumerable: true,
-        get: () => nativeFast || ownerReviewPending,
-        set: value => { nativeFast = Boolean(value); sculpture.group.userData.officeStudioNativeFast = nativeFast; }});
+        get: () => nativeFast || ownerReviewPending || executiveAlert,
+        set: value => {
+          nativeFast = Boolean(value);
+          sculpture.group.userData.officeStudioNativeFast = nativeFast;
+          refreshSculptureAlert();
+        }});
       reviewSculpture = sculpture;
       markReviewSignal();
     }
     sculpture.group.userData.officeStudioAmpSource = "native-real-issues-or-owner-review";
-    document.documentElement.dataset.officeAmpColor = presentation.color;
     document.documentElement.dataset.officeAmpSource = "native-real-issues-or-owner-review";
+    refreshSculptureAlert();
   }
 
   function start() {
@@ -213,9 +263,14 @@
     if (typeof office.UI.renderGate === "function") office.UI.renderGate();
     if (office.VIEW && typeof office.VIEW.dirty === "function") office.VIEW.dirty("main");
     tintExistingAmpersand();
-    if (window.parent !== window && typeof office.UI.openManual === "function") {
-      // The host owns the destination. Only a signal leaves the isolated room.
-      office.UI.openManual = () => window.parent.postMessage({type: "office-studio:open-manual"}, "*");
+    if (window.parent !== window) {
+      const notifyStudio = type => window.parent.postMessage({type}, presentation.studioOrigin);
+      if (typeof office.UI.openManual === "function") {
+        office.UI.openManual = () => notifyStudio("office-studio:open-manual");
+      }
+      if (typeof office.UI.openAdd === "function") {
+        office.UI.openAdd = () => notifyStudio("office-studio:add-agent");
+      }
     }
     document.title = presentation.name + " · Office Suite";
     document.documentElement.dataset.officeTheme = "ready";

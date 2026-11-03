@@ -1,8 +1,8 @@
 """Start the local office and open its browser after the bound server is ready.
 
-Python 3.10+; no installation step. An optional private room stays outside the
-portable package: use --room-file, OFFICE_STUDIO_ROOM_FILE, or an owner-supplied
-private-room.html beside this launcher. Only the selected file is considered.
+Python 3.10+; no installation step. The bundled room is the default. Override it
+with --room-file, OFFICE_STUDIO_ROOM_FILE, or an owner-supplied private-room.html
+beside this launcher. Explicit overrides stay outside the application assets.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ sys.dont_write_bytecode = True
 
 
 def find_room(explicit=None):
-    """Resolve one explicit owner-supplied room; never search private folders."""
+    """Resolve one explicit override or the bundled room; never search folders."""
     room_root = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
     chosen = explicit if explicit is not None else os.environ.get("OFFICE_STUDIO_ROOM_FILE")
     if chosen:
@@ -33,7 +33,7 @@ def find_room(explicit=None):
             raise ValueError("The selected room file was not found. Check --room-file or OFFICE_STUDIO_ROOM_FILE.")
         return candidate.resolve()
     candidate = room_root / "private-room.html"
-    return candidate.resolve() if candidate.is_file() else None
+    return candidate.resolve() if candidate.is_file() else ROOT / "room" / "office.html"
 
 
 def bind_office(factory, port, data_dir, room_file):
@@ -111,7 +111,7 @@ def main(argv=None):
         print(f"Port {args.port} is unavailable; using a free port for this Office Studio session.", flush=True)
     print(f"Office Studio: http://127.0.0.1:{port}/", flush=True)
     print("Offices stay on this computer. Keep this window open; press Ctrl+C to stop.", flush=True)
-    print("Optional private room enabled." if room_file else "Starting the desk floor; no optional private room selected.", flush=True)
+    print("Office Suite room enabled.", flush=True)
     stopped = threading.Event()
     browser = None
     if not args.no_browser:

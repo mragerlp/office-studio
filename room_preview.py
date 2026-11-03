@@ -1,8 +1,9 @@
-"""Isolated, optional preview of an owner's explicit local HTML room file.
+"""Isolated bundled room, with an optional owner's local HTML override.
 
-The source stays outside this distribution. Only a minimal simulated pack crosses
-into the preview origin; provider configuration and drafting records stay out.
+Only a minimal simulated pack crosses into the preview origin; provider
+configuration and drafting records stay out. External overrides stay untouched.
 """
+import html
 import json
 from pathlib import Path
 import re
@@ -16,6 +17,35 @@ STYLES = {"headset", "blazer", "hoodie", "field", "vest", "site", "press", "robo
 COLORS = {"crimson", "orange", "violet", "teal", "azure", "green", "lime", "plum", "indigo", "aqua", "slate", "olive"}
 KEY = r"[0-9a-f]{32}"
 THREE = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+LOCAL_THREE = "/assets/three-r128.min.js"
+
+
+def renderer_names(crew):
+    """Map saved names to renderer keys without changing saved identities.
+
+    The original renderer requires CRIMSON in seat one and short ASCII keys.
+    Preserve compatible keys where possible; reserve collision-free aliases for
+    all other names. Presentation restores the actual name/title after seating.
+    """
+    result, used = [], set()
+    for position, person in enumerate(crew):
+        name = person["name"]
+        candidate = "CRIMSON" if position == 0 else name
+        slug = re.sub(r"[^a-z0-9]+", "-", candidate.lower()).strip("-")
+        if not re.fullmatch(r"[A-Z][A-Z0-9 -]{0,13}", candidate) or slug in used:
+            candidate = f"DESK{position + 1:02}"
+            while candidate.lower() in used:
+                candidate = "X" + candidate
+            slug = candidate.lower()
+        used.add(slug)
+        result.append(candidate)
+    return result
+
+
+def executive_index(crew):
+    """One saved executive identity; never reorder the crew to seat it."""
+    return next((i for i, a in enumerate(crew) if a.get("name") == "CRIMSON"),
+                next((i for i, a in enumerate(crew) if a.get("specialty") == "Chief of Staff"), 0))
 
 
 def clean_text(value, limit):
@@ -38,33 +68,41 @@ def systems(value):
 
 
 def renderer_pack(workspace):
-    """Return None for incompatible crews; never rename or invent an agent."""
+    """Adapt valid saved crews to the room, preserving rows and gate owners.
+
+    Empty or malformed legacy crews return None so Studio keeps its 2D view;
+    no invented desk or persisted migration is needed to display an old office.
+    """
     if not isinstance(workspace, dict):
         return None
     title = clean_text(workspace.get("name"), 120)
     crew = workspace.get("crew")
     if not title or not isinstance(crew, list) or not 1 <= len(crew) <= 10:
         return None
-    exported, names, sources = [], set(), []
+    if any(not isinstance(a, dict) or not clean_text(a.get("name"), 60) for a in crew):
+        return None
+    keys = renderer_names(crew)
+    exported, names, sources = [], {}, []
     for position, person in enumerate(crew):
         if not isinstance(person, dict):
             return None
         name = person.get("name")
         specialty = clean_text(person.get("specialty"), 120)
         instruction = clean_text(person.get("instruction"), 4000)
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Z][A-Z0-9 -]{0,13}", name) or name != name.strip():
+        if name != name.strip() or any(char in name for char in "\n\t"):
             return None
-        if name in names or (position == 0 and name != "CRIMSON") or not specialty or not instruction:
+        if name.casefold() in {n.casefold() for n in names} or not specialty or not instruction:
             return None
-        names.add(name)
+        names[name] = keys[position]
         labels = systems(person.get("systems"))
         for label in labels:
             if label not in sources and len(sources) < 20:
                 sources.append(label)
         color, style = person.get("color"), person.get("style")
-        exported.append({"name": name, "specialty": specialty, "instruction": instruction,
+        exported.append({"name": keys[position], "specialty": specialty, "instruction": instruction,
                          "engine": clean_text(person.get("engine"), 100) or "Local demo",
-                         "color": "crimson" if position == 0 else color if isinstance(color, str) and color in COLORS else "azure",
+                         "color": color if isinstance(color, str) and color in COLORS else
+                         "crimson" if position == executive_index(crew) else "azure",
                          "style": style if isinstance(style, str) and style in STYLES else "headset", "systems": labels})
     gates = workspace.get("gates", [])
     if not isinstance(gates, list) or len(gates) > 40:
@@ -77,7 +115,7 @@ def renderer_pack(workspace):
         brief = gate.get("brief", {})
         if not need or not isinstance(brief, dict):
             return None
-        approvals.append({"owner": gate["owner"], "need": need, "brief": {
+        approvals.append({"owner": names[gate["owner"]], "need": need, "brief": {
             "action": clean_text(brief.get("action"), 2000) or "Review this prepared item. No external action is performed.",
             "ifDecline": clean_text(brief.get("ifDecline"), 2000) or "Keep this item held for owner review."}})
     return {"office": title, "feed": "simulated", "rules": clean_text(workspace.get("rules"), 8000) or
@@ -97,7 +135,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
         if key and hostname:
             origin = f"http://{hostname}:{self.server.server_port}"
             parent = f"http://{hostname}:{self.server.preview.studio_port}"
-            policy = (f"default-src 'none'; script-src 'unsafe-inline' {THREE}; style-src 'unsafe-inline'; "
+            policy = (f"default-src 'none'; script-src 'unsafe-inline' {origin}{LOCAL_THREE}; style-src 'unsafe-inline'; "
                       f"img-src data:; font-src data:; connect-src {origin}/packs/{key}.json; "
                       f"object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {parent}")
             self.send_response(status)
@@ -133,6 +171,9 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.fail(405)
             return
         hostname = allowed[hosts[0].lower()]
+        if self.path == LOCAL_THREE:
+            self.reply(200, self.server.preview.three, "text/javascript; charset=utf-8")
+            return
         page = re.fullmatch(rf"/(?:room/index\.html|examples/iv-therapy/index\.html)\?pack=({KEY})(?:&view=overview)?", self.path)
         data = re.fullmatch(rf"/packs/({KEY})\.json", self.path)
         if not (page or data):
@@ -176,6 +217,11 @@ class RoomPreview:
         self.load_workspace = load_workspace
         self.check_logo = check_logo
         self.theme = Path(__file__).with_name("room_theme.js").read_text(encoding="utf-8")
+        self.three = (Path(__file__).parent / "assets" / "three-r128.min.js").read_bytes()
+        # Only the known dependency URL is rewritten, never arbitrary links.
+        script = ('src="' + THREE + '"').encode()
+        if self.html.count(script) == 1:
+            self.html = self.html.replace(script, ('src="' + LOCAL_THREE + '"').encode(), 1)
         self.studio_port = studio_port
         self.issued = set()
         self.httpd = LoopbackHTTPServer(("127.0.0.1", port), PreviewHandler)
@@ -205,16 +251,19 @@ class RoomPreview:
             except Exception:
                 pass
         agents = []
-        for person in workspace["crew"]:
+        executive = executive_index(workspace["crew"])
+        for position, (person, key_name) in enumerate(zip(workspace["crew"], renderer_names(workspace["crew"]))):
+            chief = position == executive
             appearance = person.get("appearance", {})
             if not isinstance(appearance, dict):
                 appearance = {}
             color = appearance.get("color", "")
             if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
-                color = brand_color if person["name"] == "CRIMSON" else ""
-            default_title = "Head Executive" if person["name"] == "CRIMSON" else (
+                color = brand_color if chief else ""
+            default_title = "Head Executive" if chief else (
                 "Legal Review" if person["name"].casefold() == "legal" else person["name"])
-            agents.append({"agent": person["name"], "title": clean_text(appearance.get("title"), 60) or default_title, "color": color})
+            agents.append({"agent": key_name, "title": clean_text(appearance.get("title"), 60) or default_title,
+                           "color": color, "executive": chief})
         presentation = {"name": workspace["name"], "color": brand_color, "logo": checked_logo, "agents": agents,
                         "studioOrigin": f"http://{hostname}:{self.studio_port}"}
         encoded = json.dumps(presentation, ensure_ascii=True, allow_nan=False)
@@ -222,8 +271,22 @@ class RoomPreview:
             encoded = encoded.replace(character, escape)
         injection = ('<script type="application/json" id="office-studio-presentation">' + encoded +
                      '</script><script data-office-theme-adapter="1">' + self.theme + '</script>').encode("utf-8")
-        closing = self.html.lower().rfind(b"</body>")
-        return self.html[:closing] + injection + self.html[closing:] if closing >= 0 else self.html + injection
+        page = self.html
+        # Static brand text can otherwise paint before asynchronous room boot.
+        # Only the recognized original wordmark/title nodes are substituted.
+        name = html.escape(workspace["name"], quote=True).encode("utf-8")
+        # Restrict this substitution to static HTML before the first script.
+        # The mirror builds its own wordmark in a JavaScript template literal;
+        # putting a stored company name into that literal would be executable.
+        static, delimiter, scripts = page.partition(b"<script")
+        static = re.sub(rb'<span class="wordmark"(?: aria-label="Beyder&amp;Co\.")?>BEYDER<i>&amp;</i>CO\.</span>',
+                        lambda _: b'<span class="wordmark">' + name + b'</span>', static)
+        if b"async function loadPracticePack(key)" in page:
+            static = re.sub(rb'<title>[^<]*</title>', lambda _: b'<title>' + name + b'</title>', static, count=1)
+            static = static.replace(b'<span class="title">AGENT OFFICE</span>', b'<span class="title">OFFICE SUITE</span>')
+        page = static + delimiter + scripts
+        closing = page.lower().rfind(b"</body>")
+        return page[:closing] + injection + page[closing:] if closing >= 0 else page + injection
 
     def url(self, workspace, hostname):
         if hostname not in ("127.0.0.1", "localhost") or renderer_pack(workspace) is None:

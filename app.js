@@ -30,6 +30,7 @@ const state = {
   rooms: new Map(),
   roomFrame: null,
   roomFrameId: "",
+  addingFromRoom: false,
 };
 const genericPack = {
   practice: "General business",
@@ -189,8 +190,13 @@ const localTemplates = {
     ],
   ),
 };
-function isChief(agent) {
-  return agent?.name === "CRIMSON" || agent?.specialty === "Chief of Staff";
+function executiveAgent(office = state.workspace) {
+  const crew = office?.crew || [];
+  return crew.find((agent) => agent.name === "CRIMSON") ||
+    crew.find((agent) => agent.specialty === "Chief of Staff") || crew[0];
+}
+function isChief(agent, office = state.workspace) {
+  return !!agent && agent.name === executiveAgent(office)?.name;
 }
 function defaultAgentTitle(agent) {
   return isChief(agent)
@@ -209,7 +215,7 @@ function displayAgentTitle(agent) {
   );
 }
 function defaultAgentColor(agent, workspace = state.workspace) {
-  if (isChief(agent)) return safeColor(workspace?.color);
+  if (isChief(agent, workspace)) return safeColor(workspace?.color);
   return (
     palette[agent?.color] ||
     (/^#[a-f\d]{6}$/i.test(agent?.color || "")
@@ -318,6 +324,7 @@ function applyAccent(value) {
   );
 }
 function resetWorkspaceForms() {
+  state.addingFromRoom = false;
   $("draft-brief").value = "";
   $("draft-provider").value = "route";
   state.deskKey = "";
@@ -527,6 +534,7 @@ async function loadTemplate() {
   }
 }
 function showSetup() {
+  document.body.classList.remove("room-full-window");
   releaseRoomFrame();
   resetWorkspaceForms();
   $("office-form").reset();
@@ -793,20 +801,29 @@ function localRoomURL(value) {
 }
 function displayOfficeView(entry) {
   const ready = !!entry?.url;
-  const showRoom = ready && entry.view === "room";
+  const showRoom = entry?.view === "room" && (ready || entry.pending);
+  const fullWindow = new URLSearchParams(location.search).get("view") === "room";
+  document.body.classList.toggle("room-full-window", fullWindow && showRoom);
   $("view-room").disabled = !ready;
   $("view-room").setAttribute("aria-pressed", String(showRoom));
   $("view-desks").setAttribute("aria-pressed", String(!showRoom));
   $("room-stage").hidden = !showRoom;
   $("desk-workspace").hidden = showRoom;
-  $("room-full-tab").hidden = !ready;
-  if (ready) $("room-full-tab").href = entry.url;
-  else $("room-full-tab").removeAttribute("href");
+  const fullLink = $("room-full-tab");
+  fullLink.hidden = !ready;
+  if (ready) {
+    const url = new URL(location.pathname, location.origin);
+    if (!fullWindow) url.searchParams.set("view", "room");
+    url.hash = "office/" + state.selectedId;
+    fullLink.href = url.href;
+    fullLink.target = fullWindow ? "_self" : "_blank";
+    fullLink.textContent = fullWindow ? "Back to workspace" : "Open room in full tab ↗";
+  } else fullLink.removeAttribute("href");
   $("room-availability").textContent = entry?.pending
-    ? "Checking the optional local 3D room…"
+    ? "Opening your office…"
     : ready
-      ? "Private local room · simulated activity"
-      : "3D room unavailable on this host. Desks & drafts are ready to use.";
+      ? "3D office · simulated activity"
+      : "The room could not open. You can still use Desks & drafts.";
   for (const frame of $("room-frames").children)
     frame.hidden = frame !== entry?.frame;
 }
@@ -834,7 +851,7 @@ function ensureRoomFrame(entry, workspace, reload) {
       "allow-scripts allow-same-origin allow-pointer-lock",
     );
     frame.setAttribute("referrerpolicy", "no-referrer");
-    frame.setAttribute("allow", "screen-wake-lock");
+    frame.setAttribute("allow", "screen-wake-lock; fullscreen");
     frame.addEventListener("load", syncRoomReviewSignal);
     frame.setAttribute("aria-describedby", "room-disclosure");
     frame.addEventListener("error", () => {
@@ -873,7 +890,7 @@ function syncOfficeRoom() {
   const reload = !!entry?.frame;
   if (!entry)
     entry = {
-      view: "desks",
+      view: "room",
       userChoice: false,
       url: null,
       frame: null,
@@ -918,6 +935,7 @@ function renderWorkspace() {
   $("workspace").hidden = false;
   applyAccent(workspace.color);
   $("workspace-title").textContent = workspace.name;
+  $("room-title").textContent = workspace.name;
   $("workspace-town").textContent =
     workspace.town || "Your local working space";
   $("town-map").hidden = !workspace.town;
@@ -995,10 +1013,20 @@ function syncRoomReviewSignal() {
     !localRoomURL(frame.src)
   )
     return;
-  const pending = office.drafts.some((d) => d.status === "pending");
   frame.contentWindow.postMessage(
-    { type: "office-studio:review-signal", pending },
+    {
+      type: "office-studio:review-signal",
+      pending: office.drafts.some((draft) => draft.status === "pending"),
+      executivePending: hasExecutiveReview(office),
+    },
     new URL(frame.src).origin,
+  );
+}
+
+function hasExecutiveReview(office) {
+  const executive = executiveAgent(office);
+  return !!executive && office.drafts.some(
+    (draft) => draft.status === "pending" && draft.agent === executive.name,
   );
 }
 
@@ -1007,6 +1035,7 @@ function updateReviewMark(pending) {
   mark.disabled = !state.workspace;
   mark.dataset.pending = String(pending);
   mark.dataset.active = String(pending > 0);
+  mark.dataset.executiveAlert = String(hasExecutiveReview(state.workspace));
   const label = !state.workspace
     ? "Beyder & Co. ampersand"
     : `Beyder & Co. · Open approval inbox · ${pending} pending draft${pending === 1 ? "" : "s"}`;
@@ -1114,10 +1143,17 @@ window.addEventListener("message", (event) => {
     state.roomFrameId !== state.workspace.id ||
     event.source !== frame.contentWindow ||
     !localRoomURL(frame.src) ||
-    event.origin !== new URL(frame.src).origin ||
-    event.data?.type !== "office-studio:open-manual"
+    event.origin !== new URL(frame.src).origin
   )
     return;
+  if (event.data?.type === "office-studio:add-agent") {
+    if (state.busy || state.workspace.crew.length >= 10) return;
+    state.addingFromRoom = true;
+    chooseOfficeView("desks");
+    $("show-add-agent").click();
+    return;
+  }
+  if (event.data?.type !== "office-studio:open-manual") return;
   const url = manualURL(state.workspace.manualUrl || "");
   const link = $("field-manual-link");
   link.hidden = !url;
@@ -1259,8 +1295,9 @@ $("office-form").addEventListener("submit", async (event) => {
     state.draftId = "";
     renderSelector();
     renderWorkspace();
-    notice("Your office is ready. Choose a desk and prepare a draft.");
-    $("draft-brief").focus();
+    notice("Your office is ready. Choose Desks in the tower to meet your crew.");
+    $("room-title").focus({ preventScroll: true });
+    $("room-stage").scrollIntoView({ block: "start", behavior: "instant" });
   } catch (error) {
     if (epoch === state.epoch) notice(error.message, true);
   } finally {
@@ -1395,6 +1432,11 @@ $("show-add-agent").addEventListener("click", () => {
 $("cancel-add-agent").addEventListener("click", () => {
   $("add-agent-form").hidden = true;
   $("show-add-agent").hidden = false;
+  if (state.addingFromRoom) {
+    state.addingFromRoom = false;
+    chooseOfficeView("room");
+    $("room-title").focus();
+  }
 });
 $("add-agent-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1409,7 +1451,12 @@ $("add-agent-form").addEventListener("submit", (event) => {
       $("add-agent-form").reset();
       $("add-agent-form").hidden = true;
       $("show-add-agent").hidden = false;
-      notice("New desk added. Choose it to prepare a brief.");
+      if (state.addingFromRoom) {
+        state.addingFromRoom = false;
+        chooseOfficeView("room");
+        $("room-title").focus();
+      }
+      notice("New desk added to your office.");
     },
   );
 });

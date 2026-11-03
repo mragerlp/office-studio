@@ -624,17 +624,17 @@ def create_server(port=8765, data_dir=None, room_file=None, room_port=0):
     server.daemon_threads = True
     try:
         server.store = Store(data_dir if data_dir is not None else Path.home() / ".office-studio")
-        if room_file is not None:
-            from room_preview import RoomPreview
-            def load_workspace(ident):
-                with server.store.connection() as db:
-                    try:
-                        return server.store.get(db, ident)
-                    except APIError as exc:
-                        if exc.status == 404:
-                            return None
-                        raise
-            server.room_preview = RoomPreview(room_file, load_workspace, server.server_port, room_port, check_logo=logo)
+        room_file = room_file if room_file is not None else ROOT / "room" / "office.html"
+        from room_preview import RoomPreview
+        def load_workspace(ident):
+            with server.store.connection() as db:
+                try:
+                    return server.store.get(db, ident)
+                except APIError as exc:
+                    if exc.status == 404:
+                        return None
+                    raise
+        server.room_preview = RoomPreview(room_file, load_workspace, server.server_port, room_port, check_logo=logo)
     except Exception:
         server.server_close()
         raise
@@ -645,7 +645,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".office-studio")
-    parser.add_argument("--room-file", type=Path, help="Owner-supplied local HTML room; never copied into this application")
+    parser.add_argument("--room-file", type=Path, help="Override the bundled room with an owner-supplied local HTML file")
     parser.add_argument("--room-port", type=int, default=0, help="Loopback room preview port (0 chooses a free port)")
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
