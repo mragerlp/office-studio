@@ -324,12 +324,12 @@ function applyAccent(value) {
     .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
   document.documentElement.style.setProperty(
-    "--amp-surface",
-    luminance > 0.26 ? "#203026" : "transparent",
+    "--mark-edge-light",
+    luminance > 0.26 ? "#333" : "transparent",
   );
   document.documentElement.style.setProperty(
-    "--dark-amp-surface",
-    luminance < 0.15 ? "#c2d0c6" : "transparent",
+    "--mark-edge-dark",
+    luminance < 0.24 ? "#ddd" : "transparent",
   );
   document.documentElement.style.setProperty(
     "--accent-ink",
