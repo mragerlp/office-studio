@@ -20,6 +20,11 @@ const state = {
   selectedId: "",
   draftId: "",
   deskKey: "",
+  files: [],
+  filesPhase: "idle",
+  releaseFor: "",
+  draftAttempt: null,
+  latestDraftId: "",
   busy: false,
   template: null,
   templatePreview: null,
@@ -272,12 +277,15 @@ async function api(path, body) {
   } catch {
     throw new Error("The local server returned an unreadable response.");
   }
-  if (!response.ok)
-    throw new Error(
+  if (!response.ok) {
+    const error = new Error(
       typeof result.error === "string"
         ? result.error
         : "The local server could not complete this request.",
     );
+    error.code = result.code;
+    throw error;
+  }
   return result;
 }
 function notice(message, error = false) {
@@ -330,6 +338,18 @@ function applyAccent(value) {
 }
 function resetWorkspaceForms() {
   state.addingFromRoom = false;
+  state.files = [];
+  state.filesPhase = "idle";
+  state.releaseFor = "";
+  state.draftAttempt = null;
+  state.latestDraftId = "";
+  $("review-latest").hidden = true;
+  $("reset-attempt").hidden = true;
+  $("draft-feedback").textContent = "";
+  $("file-status").textContent = "";
+  $("add-file").value = "";
+  $("share-file").checked = false;
+  renderFileLibrary("");
   $("draft-brief").value = "";
   $("draft-provider").value = "route";
   state.deskKey = "";
@@ -355,6 +375,11 @@ function setBusy(value) {
   $("approve-draft").disabled = value;
   $("decline-draft").disabled = value;
   $("draft-provider").disabled = value;
+  $("draft-agent").disabled = value;
+  $("draft-brief").disabled = value;
+  $("add-file").disabled = value || state.filesPhase !== "ready";
+  $("draft-file").disabled = value || state.filesPhase !== "ready";
+  $("delete-file").disabled = value;
   $("add-agent-form").querySelector("button[type=submit]").disabled = value;
   $("generate-draft").firstChild.textContent = value
     ? "Please wait…"
@@ -708,6 +733,125 @@ function renderDeskSettings() {
   select.value = route.provider;
   renderRouteModels(route.model || "");
 }
+function officePath(id, suffix) {
+  return "/api/workspaces/" + encodeURIComponent(id) + suffix;
+}
+function selectedFile() {
+  return state.files.find((file) => file.id === $("draft-file").value);
+}
+// Retain only a fingerprint and request token for an interrupted submission.
+// The selected original and brief stay out of browser storage.
+async function fileAttempt(id, epoch, body) {
+  const key = "office-studio:file-draft:" + id;
+  const bytes = new TextEncoder().encode(JSON.stringify(body));
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  if (!isCurrent(id, epoch)) return null;
+  const signature = Array.from(new Uint8Array(hash), (n) => n.toString(16).padStart(2, "0")).join("");
+  let previous = state.draftAttempt;
+  if (!previous) {
+    try { previous = JSON.parse(sessionStorage.getItem(key)); } catch { /* Session storage is optional. */ }
+  }
+  const token = previous?.signature === signature && typeof previous.id === "string"
+    ? previous.id : crypto.randomUUID();
+  state.draftAttempt = {signature, id: token};
+  try { sessionStorage.setItem(key, JSON.stringify(state.draftAttempt)); } catch { /* In-memory retry. */ }
+  return token;
+}
+function forgetFileAttempt() {
+  state.draftAttempt = null;
+  try { sessionStorage.removeItem("office-studio:file-draft:" + state.selectedId); } catch { /* In-memory retry. */ }
+}
+function fileLabel(file) {
+  return file.name + " · " + file.version.slice(0, 8);
+}
+function renderFileLibrary(selectId = $("draft-file").value) {
+  const select = $("draft-file");
+  select.replaceChildren(option("", "Brief only"));
+  for (const file of state.files) select.append(option(file.id, fileLabel(file)));
+  select.value = state.files.some((file) => file.id === selectId) ? selectId : "";
+  $("saved-file-field").hidden = !state.files.length;
+  select.disabled = state.busy || state.filesPhase !== "ready";
+  $("add-file").disabled = select.disabled;
+  $("reload-files").hidden = state.filesPhase !== "error";
+  const file = selectedFile();
+  $("file-tools").hidden = !file;
+  $("file-delete-options").open = false;
+  const original = $("original-download");
+  if (file) original.href = officePath(state.selectedId, "/files/" + encodeURIComponent(file.id) + "/download");
+  else original.removeAttribute("href");
+  updateProviderNote();
+}
+async function loadFiles() {
+  if (!state.workspace || state.filesPhase === "loading") return;
+  const id = state.selectedId, epoch = state.epoch;
+  state.filesPhase = "loading";
+  renderFileLibrary();
+  try {
+    const result = await api(officePath(id, "/files"));
+    if (!isCurrent(id, epoch)) return;
+    state.files = result.files;
+    state.filesPhase = "ready";
+    $("file-status").textContent = "";
+  } catch {
+    if (!isCurrent(id, epoch)) return;
+    state.filesPhase = "error";
+    $("file-status").textContent = "The saved files could not be loaded.";
+  }
+  renderFileLibrary();
+}
+async function addWorkingFile() {
+  const input = $("add-file");
+  const file = input.files[0];
+  if (!file || state.busy || !state.workspace) return;
+  const id = state.selectedId, epoch = state.epoch;
+  renderFileLibrary("");
+  setBusy(true);
+  $("file-status").textContent = "Saving the original in this office…";
+  try {
+    if (!/\.(txt|md)$/i.test(file.name) || !file.size || file.size > 32768)
+      throw new Error("Choose a nonempty .txt or .md file up to 32 KB.");
+    const bytes = await file.arrayBuffer();
+    if (!isCurrent(id, epoch)) return;
+    let content;
+    try {
+      content = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true}).decode(bytes);
+    } catch {
+      throw new Error("Save this file as UTF-8 plain text and choose it again.");
+    }
+    const result = await api(officePath(id, "/files"), {name: file.name, content});
+    if (!isCurrent(id, epoch)) return;
+    state.files = [result.file, ...state.files.filter((item) => item.id !== result.file.id)];
+    renderFileLibrary(result.file.id);
+    $("file-status").textContent = "Saved and selected: " + result.file.name;
+  } catch (error) {
+    if (isCurrent(id, epoch)) $("file-status").textContent = error.message;
+  } finally {
+    if (isCurrent(id, epoch)) {
+      input.value = "";
+      setBusy(false);
+    }
+  }
+}
+async function removeWorkingFile() {
+  const file = selectedFile();
+  if (!file || state.busy || !state.workspace) return;
+  const id = state.selectedId, epoch = state.epoch;
+  setBusy(true);
+  try {
+    const result = await api(officePath(id, "/files/" + encodeURIComponent(file.id) + "/delete"), {});
+    if (!isCurrent(id, epoch)) return;
+    state.files = result.files;
+    renderFileLibrary("");
+    $("file-status").textContent = "Removed from this office: " + file.name;
+  } catch (error) {
+    if (isCurrent(id, epoch)) $("file-status").textContent = error.message;
+  } finally {
+    if (isCurrent(id, epoch)) {
+      setBusy(false);
+      if (!selectedFile()) (state.files.length ? $("draft-file") : $("add-file")).focus();
+    }
+  }
+}
 function updateProviderNote() {
   const override = $("draft-provider").value === "demo";
   const info = routeInfo(
@@ -722,8 +866,22 @@ function updateProviderNote() {
       : "Saved route: " +
         info.label +
         ". This provider receives the brief, the selected agent’s instructions and office rules. Host configuration does not verify account access.";
-  $("generate-draft").disabled =
-    state.busy || !selectedAgent() || !info.available;
+  const file = selectedFile();
+  const desk = selectedAgent();
+  const live = !!file && !!desk && info.available && info.provider?.id !== "demo";
+  const scope = live ? JSON.stringify([state.selectedId, file.id, file.version, desk.name, info.provider.id, info.model]) : "";
+  if (scope !== state.releaseFor) {
+    $("share-file").checked = false;
+    state.releaseFor = scope;
+  }
+  $("file-release").hidden = !live;
+  $("share-file").required = live;
+  $("share-file").disabled = state.busy || !live;
+  if (live) $("file-release-label").textContent =
+    "Allow " + displayAgentTitle(desk) + " to share “" + file.name + "” with " + info.label + " for this draft.";
+  if (file && !live && info.provider?.id === "demo")
+    $("provider-note").textContent = "Local demo prepares a sample on this computer using “" + file.name + "”.";
+  $("generate-draft").disabled = state.busy || !desk || !info.available || (live && !$("share-file").checked);
 }
 function updateAgent() {
   const name = $("draft-agent").value;
@@ -950,6 +1108,7 @@ async function requestOfficeRoom(entry, workspace, epoch, reload) {
 function renderWorkspace() {
   const workspace = state.workspace;
   if (!workspace) return;
+  if (state.filesPhase === "idle") loadFiles();
   history.replaceState(null, "", "#office/" + workspace.id);
   $("setup").hidden = true;
   $("workspace").hidden = false;
@@ -1129,8 +1288,14 @@ function renderDrafts() {
   $("preview-brief").textContent = draft.brief;
   $("preview-agent").textContent =
     `Prepared with ${agentDisplayLabel(draft.agent)}`;
+  $("preview-source").hidden = !draft.source;
+  $("preview-source").textContent = draft.source ? "Source file: " + fileLabel(draft.source) : "";
   $("preview-text").textContent = draft.text;
   $("decision-buttons").hidden = draft.status !== "pending";
+  const download = $("download-draft");
+  download.hidden = draft.status !== "approved";
+  if (!download.hidden) download.href = officePath(state.selectedId, "/drafts/" + encodeURIComponent(draft.id) + "/download");
+  else download.removeAttribute("href");
   $("decision-note").textContent =
     draft.status === "approved"
       ? "Approval recorded here. No outside action was performed."
@@ -1138,23 +1303,28 @@ function renderDrafts() {
         ? "Declined and kept here for reference. Prepare a new draft to revise the work."
         : "Review the complete text. Your decision is a record only.";
 }
-async function mutateWorkspace(path, body, after) {
+async function mutateWorkspace(path, body, after, onError) {
   if (state.busy || !state.workspace) return;
   const id = state.selectedId,
     epoch = state.epoch;
   setBusy(true);
   notice("");
   try {
+    const payload = typeof body === "function" ? await body(id, epoch) : body;
+    if (!isCurrent(id, epoch)) return;
     const workspace = await api(
       `/api/workspaces/${encodeURIComponent(id)}${path}`,
-      body,
+      payload,
     );
     if (!isCurrent(id, epoch)) return;
     state.workspace = workspace;
     if (after) after(workspace);
     renderWorkspace();
   } catch (error) {
-    if (isCurrent(id, epoch)) notice(error.message, true);
+    if (isCurrent(id, epoch)) {
+      notice(error.message, true);
+      if (onError) onError(error);
+    }
   } finally {
     if (isCurrent(id, epoch)) setBusy(false);
   }
@@ -1367,6 +1537,31 @@ $("save-appearance").addEventListener("click", () => saveAppearance());
 $("reset-appearance").addEventListener("click", () => saveAppearance(true));
 $("draft-agent").addEventListener("change", updateAgent);
 $("draft-provider").addEventListener("change", updateProviderNote);
+$("add-file").addEventListener("change", addWorkingFile);
+$("reload-files").addEventListener("click", loadFiles);
+$("delete-file").addEventListener("click", removeWorkingFile);
+$("share-file").addEventListener("change", updateProviderNote);
+$("draft-file").addEventListener("change", () => {
+  $("file-status").textContent = "";
+  renderFileLibrary();
+});
+$("draft-brief").addEventListener("input", () => {
+  $("share-file").checked = false;
+  updateProviderNote();
+});
+$("review-latest").addEventListener("click", () => {
+  state.draftId = state.latestDraftId;
+  renderDrafts();
+  $("boardroom").click();
+});
+$("reset-attempt").addEventListener("click", () => {
+  forgetFileAttempt();
+  $("share-file").checked = false;
+  $("reset-attempt").hidden = true;
+  $("draft-feedback").textContent = "Check the file and destination, then prepare a new draft.";
+  updateProviderNote();
+  $("draft-brief").focus();
+});
 $("route-provider").addEventListener("change", () => renderRouteModels());
 $("route-model").addEventListener("change", () =>
   renderRouteModels($("route-model").value),
@@ -1412,11 +1607,32 @@ $("draft-form").addEventListener("submit", (event) => {
     $("draft-brief").focus();
     return;
   }
+  const body = {provider, model: info.model, agent, brief};
+  const file = selectedFile();
+  if (file) {
+    const shareFile = provider !== "demo" && $("share-file").checked;
+    if (provider !== "demo" && !shareFile) return;
+    Object.assign(body, {fileId: file.id, fileVersion: file.version, shareFile});
+  }
+  $("draft-feedback").textContent = "Preparing your draft…";
+  $("review-latest").hidden = true;
+  $("reset-attempt").hidden = true;
   mutateWorkspace(
     "/drafts",
-    { provider, model: info.model, agent, brief },
+    file ? async (id, epoch) => {
+      body.requestId = await fileAttempt(id, epoch, body);
+      return body;
+    } : body,
     (workspace) => {
-      state.draftId = workspace.drafts.at(-1)?.id || "";
+      const prepared = file
+        ? workspace.drafts.find((draft) => draft.requestId === body.requestId)
+        : workspace.drafts.at(-1);
+      state.draftId = prepared?.id || "";
+      state.latestDraftId = state.draftId;
+      if (file) forgetFileAttempt();
+      $("share-file").checked = false;
+      $("review-latest").hidden = !state.latestDraftId;
+      $("draft-feedback").textContent = "Ready in your approval inbox.";
       if (override && $("draft-agent").value === agent)
         $("draft-provider").value = "route";
       notice(
@@ -1424,6 +1640,10 @@ $("draft-form").addEventListener("submit", (event) => {
           ? "Simulated draft prepared. Review the text at your table."
           : "Draft prepared. Review the text at your table.",
       );
+    },
+    (error) => {
+      $("draft-feedback").textContent = error.message;
+      $("reset-attempt").hidden = error.code !== "draft_attempt_failed";
     },
   );
 });

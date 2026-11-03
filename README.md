@@ -4,7 +4,7 @@ Office Studio is a local web app for your business's crew. Give the Head Executi
 
 The original 3D office and signature ampersand come from **Beyder & Co.** When the Head Executive needs a decision, the ampersand beside **Office Studio** and the sculpture in the room both turn red. They return to the business's accent color after the last executive alert clears.
 
-[Run the app](#start-locally) · [Set up a coding agent](#development)
+[Run the local app](#start-locally) · [Try the file walkthrough](#give-a-desk-a-file) · [Set up the hosted pilot](hosted/README.md) · [Contributor guide](AGENTS.md)
 
 ### 1. Set up the office
 
@@ -53,6 +53,16 @@ Starter crews cover general business, real estate, law, accounting, financial ad
 
 The optional **Find town on map** link opens an OpenStreetMap search only when clicked. It does not establish an exact location or fetch a map during setup.
 
+## Give a desk a file
+
+For a two-minute walkthrough, create a fictional office and open **Desks & drafts**.
+
+1. Add the [sample Friday inquiry](examples/friday-inquiry.txt) under **Working file**. It is also in the extracted ZIP's `examples` folder. The local edition accepts UTF-8 `.txt` and `.md` files up to 32 KiB each.
+2. Select a desk and enter “Draft a reply asking what time works. Leave availability unconfirmed.” Choose the local demo for a rehearsal. For a live draft, review the file, provider and model shown and confirm the transfer.
+3. Prepare the draft, open it in the review inbox, and approve or decline. Approval enables a text download. The draft records its desk and the version of its source file.
+
+Removing a local original revokes future access to that file. Earlier local drafts retain their text and source label. The hosted pilot uses a different retention rule: removing the original deletes its derived runs and drafts. Already downloaded or transmitted copies remain with their recipients.
+
 **Help** at the end of the page opens the [Beyder & Co. knowledge base](https://manual.beyderco.com/) when clicked. The [bundled app guide](help.html) is also available offline. Under **Office rules & approval gates**, save a company-specific HTTPS operating-manual link. It is available from the workspace header and from **The Field** in a compatible room. The app opens the manual on request. It does not crawl the site or give model providers its contents.
 
 ## Inside the 3D office
@@ -84,7 +94,7 @@ Provider setup references are available from [OpenAI](https://developers.openai.
 
 ## Supabase
 
-**Today.** Contributors can connect Codex to a specific Supabase project through MCP. The packaged app runs locally and stores offices in SQLite. Running the app and its tests requires no Supabase account.
+**Local and hosted editions.** The packaged app stores offices in SQLite. The separate hosted file pilot uses Supabase Auth, private Postgres rows and a server-side drafting function. A signed-in owner creates an office, gives a desk a text file, reviews its draft and downloads the approved result. Igor's 3D room displays the office's desk names, colors and review status. The host supplies its own project, OAuth application configuration and HTTPS site. [Hosted setup, limits and tests](hosted/README.md)
 
 **Developer setup.** In PowerShell or Terminal, replace `YOUR_PROJECT_REF` with the reference for your development project and keep the URL quoted. Complete the Supabase authorization in your browser. Use `codex mcp get supabase` to inspect the configured endpoint and `codex mcp list` to check the authentication method.
 
@@ -94,7 +104,7 @@ codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJ
 
 The project reference scopes the connection and disables account-wide tools, even with `account` in the requested groups. For a read-only review, append `&read_only=true` inside the quotes. Each contributor authorizes their own account. Keep developer tokens and privileged keys out of the browser app, repository and ZIPs. [Supabase MCP options](https://supabase.com/docs/guides/ai-tools/mcp)
 
-**Hosted edition proposal.** Use Supabase Auth for Google or Microsoft sign-in and Postgres row-level security to limit each office's desks, tasks and approvals to its members. An owner would separately authorize Gmail or Outlook access and choose which desk and model can receive a selected message. Model credentials would stay on the server. The first workflow would draft a reply for owner review inside Studio. [Google sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) · [Microsoft sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-azure) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+**Business account and connections.** Google or Microsoft signs the owner into the hosted office. A separate server-side API connection authorizes live drafting for each desk. Gmail and Outlook mailbox access, consumer subscription sign-in for models, and customer billing are future work. [Google sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) · [Microsoft sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-azure) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 
 ## Check and package
 

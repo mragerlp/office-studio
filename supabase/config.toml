@@ -1,0 +1,6 @@
+project_id = "office-studio"
+
+[functions.office-drafts]
+# The function validates every user's access token with this project's Auth
+# service before any privileged table access. OPTIONS contains no user data.
+verify_jwt = false

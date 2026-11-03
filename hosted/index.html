@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f3ed"><title>Office Studio · Shared office</title>
+<link rel="icon" href="./ampersand.svg"><script src="./appearance.js"></script><link rel="stylesheet" href="./style.css">
+<script defer src="./config.js"></script><script defer src="./auth.js"></script>
+<script defer src="./room-view.js"></script><script defer src="./app.js"></script></head>
+<body><header><div class="brand"><a id="office-mark" aria-label="Office Studio" aria-disabled="true">&amp;</a> Office <strong>Studio</strong></div><span>SHARED OFFICE</span>
+<button type="button" class="mode-switch quiet" data-appearance-toggle aria-label="Dark mode" role="switch" aria-checked="false">☀ / ☾</button>
+<button id="logout" hidden>Sign out</button></header>
+<main>
+<p id="notice" role="status" aria-live="polite"></p>
+<section id="login" class="entry"><div class="intro"><p class="eyebrow">WELCOME TO YOUR OFFICE</p><h1>A desk for<br>your work.</h1>
+<p>Give a desk a file and a brief. Review what it prepares before sharing it.</p></div>
+<article><p class="eyebrow">THE FRONT DOOR</p><h2>Open your office</h2><p>Use your business account to enter your workspace.</p>
+<button data-login="google">Continue with Google</button><button data-login="azure" class="quiet">Continue with Microsoft</button>
+<small>Mailbox access is a separate connection.</small></article></section>
+
+<section id="signed" hidden>
+<div class="toolbar"><label for="offices">Office</label><select id="offices"></select><button id="new" class="quiet">+ New office</button></div>
+<form id="create"><p class="eyebrow">OFFICE SETUP</p><h2>Build your office</h2><label>Business name<input name="name" maxlength="100" required></label>
+<label>Accent<input name="color" type="color" value="#285b53"></label><button>Create office</button></form>
+<section id="workspace" hidden><p class="eyebrow">YOUR OFFICE SUITE</p><h1 class="workspace-title" id="title"></h1>
+<iframe id="office-room" title="3D Office Suite" sandbox="allow-scripts" hidden></iframe>
+<details id="hosted-add-desk"><summary>Add a desk</summary>
+<form id="add-desk"><label>Desk name<input id="desk-name" name="name" maxlength="60" required placeholder="Scheduling"></label>
+<label>Specialty<input id="desk-specialty" name="specialty" maxlength="120" required placeholder="Appointment requests"></label>
+<small id="desk-cap"></small><button>Add desk to office</button></form></details>
+<div class="columns"><div>
+<form id="upload"><p class="eyebrow">01 / FILES</p><h2>Bring a file</h2><label>Choose a text file<input name="file" type="file" accept=".txt,text/plain" required></label>
+<small>Plain UTF-8 text up to 64 KiB. Your office stores the original separately from drafts.</small><button>Save file to office</button></form>
+<form id="draft"><p class="eyebrow">02 / ASSIGNMENT</p><h2>Give a desk a brief</h2><label>Source file<select name="file" required></select></label>
+<label>Desk<select name="desk" required></select></label><label>Brief<textarea name="brief" rows="3" maxlength="2000" required placeholder="What would you like prepared?"></textarea></label>
+<p id="destination"></p><label id="consent-label" class="inline" hidden><input type="checkbox" name="consent"> Send this file and brief to the displayed provider.</label>
+<button>Prepare draft</button><button type="button" id="original" class="quiet">Download original</button>
+<button type="button" id="remove" class="quiet">Delete selected file</button></form>
+</div><div><article id="review" tabindex="-1"><div class="heading"><div><p class="eyebrow">03 / BOARDROOM</p><h2>Review the work</h2></div><button id="refresh" class="quiet">Refresh</button></div>
+<div id="runs"></div></article>
+<details id="connections"><summary>Connections &amp; desk settings</summary>
+<p>Provider keys belong to this office. Choosing a live model can incur charges on your provider account.</p>
+<form id="connect"><label>Provider<select name="provider"></select></label>
+<label>Provider API key<input name="key" type="password" autocomplete="off" spellcheck="false" maxlength="512"></label>
+<button>Save connection</button><button id="disconnect" type="button" class="quiet">Disconnect</button></form>
+<p id="connection-status"></p><form id="route"><label>Desk<select name="desk"></select></label><label>Model<select name="model"></select></label><button>Save desk route</button></form></details></div></div>
+</section></section></main>
+<footer>Office Studio · <a href="https://www.beyderco.com/" rel="noreferrer" target="_blank">Beyder &amp; Co.</a>
+<a id="hosted-help" href="https://manual.beyderco.com/" rel="noreferrer" target="_blank">Help ↗</a></footer>
+</body></html>

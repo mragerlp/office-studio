@@ -761,6 +761,33 @@ details[open] summary {
   color: var(--muted);
   margin-top: 13px;
 }
+.working-file {
+  min-width: 0;
+  margin: 20px 0 0;
+  padding: 5px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.working-file legend { padding: 0 5px; font-size: 13px; font-weight: 600; }
+.working-file label { margin: 9px 0 7px; }
+.working-file #file-tools { margin-top: 10px; font-size: 12px; }
+.working-file summary { margin: 8px 0; }
+.working-file p, .file-release span, #preview-source, #draft-feedback { overflow-wrap: anywhere; }
+.file-release {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--field-line);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+.draft-panel .file-release input[type="checkbox"] {
+  flex: none; width: 18px; min-height: 18px; height: 18px; padding: 0; margin: 0;
+  accent-color: var(--accent);
+}
+#download-draft, #review-latest, #reset-attempt { margin-top: 10px; }
+#download-draft:not([hidden]) { display: inline-flex; }
 .number-badge {
   display: flex;
   align-items: center;
