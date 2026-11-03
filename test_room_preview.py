@@ -146,6 +146,10 @@ class RoomPreviewTests(unittest.TestCase):
             status, page, headers = self.request(frame.path + "?" + frame.query, port=frame.port)
             self.assertEqual(status, 200)
             self.assertIn(b'async function loadPracticePack(key)', page)
+            for mode in ("light", "dark"):
+                status, themed, _ = self.request(f"{frame.path}?{frame.query}&appearance={mode}", port=frame.port)
+                self.assertEqual(status, 200)
+                self.assertIn(f'<html data-appearance="{mode}">'.encode(), themed.split(b"<head>", 1)[0])
             self.assertIn(b'src="/assets/three-r128.min.js"', page)
             self.assertNotIn(b'src="https://cdnjs', page)
             self.assertNotIn("https:", headers["Content-Security-Policy"])
@@ -212,6 +216,7 @@ class RoomPreviewTests(unittest.TestCase):
         good = frame.path + "?" + frame.query
         for path in ("/", "/server.py", "/room/index.html", "/examples/iv-therapy/index.html", "/packs/re.json",
                      good + "&bridge=ws://example.invalid", good + "&pack=" + item["id"],
+                     good + "&appearance=unknown", good + "&appearance=dark&appearance=light",
                      f"/room/index.html?pack={item['id']}&view=desks",
                      "/room/index.html?pack=../x", "/%2e%2e/server.py", f"/packs/{other['id']}.json",
                      "/packs/" + "0" * 32 + ".json", f"/packs/{item['id']}.json?bridge=x"):

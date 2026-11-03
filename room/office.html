@@ -422,6 +422,32 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
   .g-top .from { display: none; }
   .b-gate .who-g, .b-gate .more { display: none; }
 }
+/* The embedding Studio passes the appearance separately from agent colors. */
+:root[data-appearance="dark"] {
+    color-scheme: dark;
+    --paper: #202624;
+    --ink: #f0f3ee;
+    --charcoal: #d7e0d8;
+    --mist: #b4c0b7;
+    --fog: #303a35;
+    --rule: #515d55;
+    --crimson: #ff8085;
+    --shadow: 0 1px 3px #0004, 0 12px 36px #0005;
+}
+:root[data-appearance="dark"] :is(#topbar, #viewSelect, #mirror:not(.dark)),
+:root[data-appearance="dark"] :is(.sheet, .btn, .iconbtn, .bubble:not(.wait),
+    .card, .p-compose, .sugg, .dialog, .p-compose input, .p-compose select,
+    .p-compose textarea, .form input, .form select, .form textarea) { background: var(--paper); }
+:root[data-appearance="dark"] :is(.row[aria-current="true"], .logbox, .code, .sugg:hover, .btn:hover, .iconbtn:hover) { background: var(--fog); }
+:root[data-appearance="dark"] :is(.views button[aria-pressed="true"], .btn.ink, .btn[aria-pressed="true"], .toast) {
+    background: var(--ink); color: var(--paper);
+}
+:root[data-appearance="dark"] .btn.ink:hover { background: #c6d2c8; }
+:root[data-appearance="dark"] .tile.light { color: #17231c; }
+:root[data-appearance="dark"] :is(.bubble.wait, .tile.wait) { background: #b40c18; border-color: #b40c18; }
+:root[data-appearance="dark"] .bubble.wait .dot { color: #a70008; }
+:root[data-appearance="dark"] #gate { border-color: var(--rule); }
+:root[data-appearance="dark"] #gate.stacked { box-shadow: 0 5px 0 -2px var(--paper), 0 5px 0 -1px var(--rule), var(--shadow); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
@@ -1146,7 +1172,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(stageEl.clientWidth || window.innerWidth, stageEl.clientHeight || window.innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+function updateStudioExposure() {
+  renderer.toneMappingExposure = document.documentElement.dataset.appearance === 'dark' ? 0.72 : 1.08;
+}
+updateStudioExposure();
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 stageEl.appendChild(renderer.domElement);

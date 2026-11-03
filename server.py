@@ -449,6 +449,7 @@ class Handler(BaseHTTPRequestHandler):
             static = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
                       "/help.html": ("help.html", "text/html; charset=utf-8"),
                       "/assets/ampersand.svg": ("assets/ampersand.svg", "image/svg+xml"),
+                      "/appearance.js": ("appearance.js", "text/javascript; charset=utf-8"),
                       "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/style.css": ("style.css", "text/css; charset=utf-8")}
             pack = re.fullmatch(r"/packs/(re|law|acct|fin|med)\.json", path)
             target = static.get(path)

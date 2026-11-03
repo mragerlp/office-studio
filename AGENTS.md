@@ -49,6 +49,8 @@ The launcher prints its actual loopback address. For isolated development, pass 
 
 ## Protect private material
 
+For Supabase development access and the proposed hosted architecture, follow the [Supabase section in the README](README.md#supabase). Use a scoped development project and synthetic fixtures. Developer MCP authorization belongs to the contributor. Customer sign-in, mailbox access and model-provider access each need their own grant.
+
 Use fictional business information in fixtures, screenshots, documentation, and public packages. Do not commit credentials, environment files, local databases, customer records, uploaded tenant logos, private manuals, or private room overrides.
 
 Bloodwave confirmed Igor Beyder's clearance to publish and redistribute the original room HTML with Office Studio. The public distribution includes the approved room in `room/office.html` and the local Three.js runtime with its license. Package only the explicit allowlist. Additional owner-supplied rooms and private handoff ZIPs stay outside Git and public workflow artifacts. The existing permission for the README interior screenshot is recorded separately.

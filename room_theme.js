@@ -21,11 +21,11 @@
   let office, attempts = 0, queued = false, ownerReviewPending = false, ownerExecutivePending = false,
     reviewSculpture = null, refreshSculptureAlert = null;
 
-  function nativeExecutivePending() {
+  function nativeExecutiveGate() {
     const state = office && office.OFFICE_STATE;
     // Seeded simulated gates are still visible approvals for the executive.
     // Display titles/statuses are presentation and are not ownership sensors.
-    return Array.isArray(state && state.approvals) && state.approvals.some(gate => executiveIds.has(gate.agentId));
+    return Array.isArray(state?.approvals) && state.approvals.find(gate => executiveIds.has(gate.agentId));
   }
 
   function markReviewSignal() {
@@ -37,15 +37,30 @@
     if (refreshSculptureAlert) refreshSculptureAlert();
   }
 
-  // Only review booleans from the exact Studio parent are accepted. The old
-  // two-key payload remains generic attention; it never invents an executive
-  // approval. Neither payload carries drafts, IDs, instructions or credentials.
+  // Accept only the Studio parent's appearance, review flags and open-alert action.
+  // The old two-key review signal still indicates generic attention.
   if (window.parent !== window && typeof window.addEventListener === "function") {
     window.addEventListener("message", event => {
       const data = event.data;
       if (event.source !== window.parent || event.origin !== presentation.studioOrigin ||
           !data || typeof data !== "object" || Array.isArray(data)) return;
       const keys = Object.keys(data);
+      if (keys.length === 2 && data.type === "office-studio:appearance" && keys.includes("mode") &&
+          (data.mode === "light" || data.mode === "dark")) {
+        document.documentElement.dataset.appearance = data.mode;
+        if (typeof updateStudioExposure === "function") updateStudioExposure();
+        return;
+      }
+      if (keys.length === 1 && data.type === "office-studio:open-executive-alert") {
+        const gate = nativeExecutiveGate();
+        if (gate && typeof office.UI.select === "function") {
+          if (document.getElementById("board")?.hidden === false) office.UI.toggleBoard(false);
+          office.UI.select(gate.agentId);
+          const panel = document.getElementById("panel");
+          if (panel) { panel.tabIndex = -1; panel.focus({preventScroll: true}); }
+        }
+        return;
+      }
       const legacy = keys.length === 2 && keys.includes("type") && keys.includes("pending");
       const current = keys.length === 3 && keys.includes("type") && keys.includes("pending") &&
         keys.includes("executivePending") && typeof data.executivePending === "boolean";
@@ -154,7 +169,7 @@
         !office.THREE || typeof office.THREE.Color !== "function") return;
     const base = sculpture.base;
     if (!(base.r + base.g + base.b > 0) || typeof base.copy !== "function") return;
-    let painted = "", executiveAlert = false;
+    let painted = "", executiveAlert = false, reportedNative;
     const gains = new Map();
     function paint(hex) {
       if (painted === hex) return;
@@ -181,7 +196,13 @@
       document.documentElement.dataset.officeAmpColor = hex;
     }
     refreshSculptureAlert = () => {
-      const native = nativeExecutivePending();
+      const native = !!nativeExecutiveGate();
+      if (native !== reportedNative && window.parent !== window) {
+        // Report only the native flag. Echoing the combined flag would latch
+        // a saved draft's alert after the owner cleared it in the Studio.
+        window.parent.postMessage({type: "office-studio:room-executive-alert", pending: native}, presentation.studioOrigin);
+        reportedNative = native;
+      }
       const executive = native || ownerExecutivePending;
       executiveAlert = executive;
       sculpture.group.userData.officeStudioNativeExecutivePending = native;
