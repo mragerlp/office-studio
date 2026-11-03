@@ -35,7 +35,6 @@ const state = {
   rooms: new Map(),
   roomFrame: null,
   roomFrameId: "",
-  roomExecutivePending: false,
   addingFromRoom: false,
 };
 const genericPack = {
@@ -323,12 +322,19 @@ function applyAccent(value) {
     .map((x) => parseInt(x, 16) / 255)
     .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  // Keep the chosen accent if the idle glyph has 3:1 contrast on the dark masthead (#3c3c3c).
+  const charcoalLuminance = ((60 / 255 + 0.055) / 1.055) ** 2.4;
+  const readableOnCharcoal = (luminance + 0.05) / (charcoalLuminance + 0.05) >= 3;
+  document.documentElement.style.setProperty("--dark-idle-mark", readableOnCharcoal ? color : "var(--ink)");
   document.documentElement.style.setProperty(
     "--accent-ink",
     luminance > 0.179 ? "#000000" : "#ffffff",
   );
 }
 function resetWorkspaceForms() {
+  if ($("desk-history").open) $("desk-history").close();
+  $("desk-history-list").replaceChildren();
+  $("desk-history-title").textContent = "";
   state.addingFromRoom = false;
   state.files = [];
   state.filesPhase = "idle";
@@ -1004,8 +1010,6 @@ function releaseRoomFrame() {
   state.roomFrame.remove();
   state.roomFrame = null;
   state.roomFrameId = "";
-  state.roomExecutivePending = false;
-  updateReviewMark();
 }
 function ensureRoomFrame(entry, workspace, reload) {
   if (state.roomFrame && (reload || state.roomFrameId !== workspace.id))
@@ -1205,16 +1209,14 @@ function pendingExecutiveDraft(office) {
 function updateReviewMark(pending = state.workspace?.drafts.filter(draft => draft.status === "pending").length || 0) {
   const mark = $("review-mark");
   const saved = pendingExecutiveDraft(state.workspace);
-  const native = !!state.workspace && state.roomExecutivePending;
   mark.disabled = !state.workspace;
   mark.dataset.pending = String(pending);
-  mark.dataset.active = String(pending > 0 || native);
-  mark.dataset.executiveAlert = String(!!saved || native);
+  mark.dataset.active = String(!!saved);
+  mark.dataset.executiveAlert = String(!!saved);
   let label = "Beyder & Co. ampersand";
   if (state.workspace) {
     const executive = displayAgentTitle(executiveAgent());
     if (saved) label += ` · Review ${executive}’s draft in the approval inbox`;
-    else if (native) label += ` · Open ${executive}’s approval in the 3D office`;
     else label += ` · Open approval inbox · ${pending} pending draft${pending === 1 ? "" : "s"}`;
   }
   mark.setAttribute("aria-label", label);
@@ -1295,6 +1297,35 @@ function renderDrafts() {
         ? "Declined and kept here for reference. Prepare a new draft to revise the work."
         : "Review the complete text. Your decision is a record only.";
 }
+function openDeskHistory(seat) {
+  const office = state.workspace;
+  const agent = office.crew[seat];
+  if (!agent) return;
+  const epoch = state.epoch;
+  const dialog = $("desk-history"), list = $("desk-history-list");
+  $("desk-history-title").textContent = agentDisplayLabel(agent.name);
+  list.replaceChildren();
+  const approved = office.drafts.filter(draft => draft.agent === agent.name && draft.status === "approved");
+  for (const draft of approved.reverse()) {
+    const item = el("button", "draft-item");
+    item.type = "button";
+    const copy = el("div");
+    copy.append(el("strong", "", draft.brief), el("small", "", draft.source ? fileLabel(draft.source) : "Brief only"));
+    item.append(copy, el("span", "state-pill approved", "approved"));
+    item.addEventListener("click", () => {
+      if (!isCurrent(office.id, epoch)) return;
+      state.draftId = draft.id;
+      dialog.close();
+      chooseOfficeView("desks");
+      renderDrafts();
+      $("preview-brief").focus();
+    });
+    list.append(item);
+  }
+  if (!approved.length) list.append(el("p", "empty-inbox", "No approved drafts for this desk yet."));
+  if (!dialog.open) dialog.showModal();
+}
+
 async function mutateWorkspace(path, body, after, onError) {
   if (state.busy || !state.workspace) return;
   const id = state.selectedId,
@@ -1335,10 +1366,9 @@ window.addEventListener("message", (event) => {
     event.origin !== new URL(frame.src).origin
   )
     return;
-  if (event.data?.type === "office-studio:room-executive-alert") {
-    if (Array.isArray(event.data) || Object.keys(event.data).length !== 2 || typeof event.data.pending !== "boolean") return;
-    state.roomExecutivePending = event.data.pending;
-    updateReviewMark();
+  if (event.data?.type === "office-studio:open-delivered") {
+    if (Object.keys(event.data).length === 2 && Number.isInteger(event.data.seat) &&
+        event.data.seat >= 0 && event.data.seat < state.workspace.crew.length) openDeskHistory(event.data.seat);
     return;
   }
   if (event.data?.type === "office-studio:add-agent") {
@@ -1646,11 +1676,6 @@ $("review-mark").addEventListener("click", () => {
   if (saved) {
     state.draftId = saved.id;
     renderDrafts();
-  } else if (state.roomExecutivePending) {
-    chooseOfficeView("room");
-    state.roomFrame.focus();
-    postToRoom({type: "office-studio:open-executive-alert"});
-    return;
   }
   chooseOfficeView("desks");
   $("boardroom").click();

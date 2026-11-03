@@ -111,8 +111,9 @@ def smoke_room(port, asset_root=ROOT):
         raise RuntimeError("Frozen room presentation does not match the saved office.")
     status, raw = get(frame.port, f"/packs/{workspace['id']}.json")
     pack = json.loads(raw)
-    if status != 200 or len(pack["crew"]) != len(workspace["crew"]) or pack["gates"][0]["owner"] != pack["crew"][1]["name"]:
-        raise RuntimeError("Frozen room did not preserve crew and gate ownership.")
+    if (status != 200 or len(pack["crew"]) != len(workspace["crew"]) or pack["gates"] != []
+            or [rule["owner"] for rule in workspace["gates"]] != ["Specialist fixture with a long name"]):
+        raise RuntimeError("Frozen room must preserve the crew and keep saved policy out of its approval queue.")
     status, javascript = get(frame.port, "/assets/three-r128.min.js")
     if status != 200 or hashlib.sha256(javascript).hexdigest() != "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2":
         raise RuntimeError("Frozen room did not serve its pinned local Three.js.")
