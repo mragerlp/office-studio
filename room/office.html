@@ -425,12 +425,12 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
 /* The embedding Studio passes the appearance separately from agent colors. */
 :root[data-appearance="dark"] {
     color-scheme: dark;
-    --paper: #202624;
-    --ink: #f0f3ee;
-    --charcoal: #d7e0d8;
-    --mist: #b4c0b7;
-    --fog: #303a35;
-    --rule: #515d55;
+    --paper: #303030;
+    --ink: #f1f1f1;
+    --charcoal: #dedede;
+    --mist: #c4c4c4;
+    --fog: #424242;
+    --rule: #5b5b5b;
     --crimson: #ff8085;
     --shadow: 0 1px 3px #0004, 0 12px 36px #0005;
 }
@@ -442,8 +442,8 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
 :root[data-appearance="dark"] :is(.views button[aria-pressed="true"], .btn.ink, .btn[aria-pressed="true"], .toast) {
     background: var(--ink); color: var(--paper);
 }
-:root[data-appearance="dark"] .btn.ink:hover { background: #c6d2c8; }
-:root[data-appearance="dark"] .tile.light { color: #17231c; }
+:root[data-appearance="dark"] .btn.ink:hover { background: #cecece; }
+:root[data-appearance="dark"] .tile.light { color: #202020; }
 :root[data-appearance="dark"] :is(.bubble.wait, .tile.wait) { background: #b40c18; border-color: #b40c18; }
 :root[data-appearance="dark"] .bubble.wait .dot { color: #a70008; }
 :root[data-appearance="dark"] #gate { border-color: var(--rule); }

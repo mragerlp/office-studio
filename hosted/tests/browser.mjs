@@ -561,6 +561,10 @@ try {
     await frame.evaluate(() => window.__office.renderer.toneMappingExposure),
     0.72,
   );
+  assert.equal(
+    await page.locator("html").evaluate(n => getComputedStyle(n).backgroundColor),
+    "rgb(60, 60, 60)",
+  );
   const brief = "Prepare a polite reply for owner review.";
   await el("draft")
     .locator("select[name=desk]")
