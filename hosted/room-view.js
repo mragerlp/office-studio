@@ -52,7 +52,7 @@
     const info = {
       id: String(value.id),
       name: String(value.name).slice(0, 100),
-      color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : "#285b53",
+      color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : "#000000",
       desks,
     };
     // Appended desks can be seated in the live scene. Changed identities, order,

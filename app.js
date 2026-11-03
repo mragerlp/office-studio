@@ -312,7 +312,7 @@ function isCurrent(id, epoch) {
   return state.selectedId === id && state.epoch === epoch;
 }
 function safeColor(value) {
-  return /^#[a-f\d]{6}$/i.test(value || "") ? value : "#285b53";
+  return /^#[a-f\d]{6}$/i.test(value || "") ? value : "#000000";
 }
 function applyAccent(value) {
   const color = safeColor(value);
@@ -323,14 +323,6 @@ function applyAccent(value) {
     .map((x) => parseInt(x, 16) / 255)
     .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-  document.documentElement.style.setProperty(
-    "--mark-edge-light",
-    luminance > 0.26 ? "#333" : "transparent",
-  );
-  document.documentElement.style.setProperty(
-    "--mark-edge-dark",
-    luminance < 0.24 ? "#ddd" : "transparent",
-  );
   document.documentElement.style.setProperty(
     "--accent-ink",
     luminance > 0.179 ? "#000000" : "#ffffff",

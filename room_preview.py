@@ -244,7 +244,7 @@ class RoomPreview:
         # pack. Stored strings are JSON text, never executable markup or code.
         brand_color = workspace.get("color", "")
         if not isinstance(brand_color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", brand_color):
-            brand_color = "#285b53"
+            brand_color = "#000000"
         checked_logo = ""
         if self.check_logo:
             try:
