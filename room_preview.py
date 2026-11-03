@@ -174,7 +174,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
         if self.path == LOCAL_THREE:
             self.reply(200, self.server.preview.three, "text/javascript; charset=utf-8")
             return
-        page = re.fullmatch(rf"/(?:room/index\.html|examples/iv-therapy/index\.html)\?pack=({KEY})(?:&view=overview)?", self.path)
+        page = re.fullmatch(rf"/(?:room/index\.html|examples/iv-therapy/index\.html)\?pack=({KEY})"
+                            r"(?:&view=overview)?(?:&appearance=(light|dark))?", self.path)
         data = re.fullmatch(rf"/packs/({KEY})\.json", self.path)
         if not (page or data):
             self.fail(404)
@@ -189,7 +190,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.fail(404)
             return
         if page:
-            self.reply(200, preview.themed_html(key, hostname), "text/html; charset=utf-8", key, hostname)
+            self.reply(200, preview.themed_html(key, hostname, page[2]), "text/html; charset=utf-8", key, hostname)
         else:
             self.reply(200, json.dumps(pack, ensure_ascii=False, allow_nan=False).encode("utf-8"))
 
@@ -237,7 +238,7 @@ class RoomPreview:
     def pack(self, key):
         return renderer_pack(self.load_workspace(key))
 
-    def themed_html(self, key, hostname):
+    def themed_html(self, key, hostname, mode=None):
         workspace = self.load_workspace(key)
         # This presentation allowlist is separate from the renderer's identity
         # pack. Stored strings are JSON text, never executable markup or code.
@@ -282,6 +283,8 @@ class RoomPreview:
         static = re.sub(rb'<span class="wordmark"(?: aria-label="Beyder&amp;Co\.")?>BEYDER<i>&amp;</i>CO\.</span>',
                         lambda _: b'<span class="wordmark">' + name + b'</span>', static)
         if b"async function loadPracticePack(key)" in page:
+            if mode in ("light", "dark"):
+                static = static.replace(b"<html>", b'<html data-appearance="' + mode.encode("ascii") + b'">', 1)
             static = re.sub(rb'<title>[^<]*</title>', lambda _: b'<title>' + name + b'</title>', static, count=1)
             static = static.replace(b'<span class="title">AGENT OFFICE</span>', b'<span class="title">OFFICE SUITE</span>')
         page = static + delimiter + scripts

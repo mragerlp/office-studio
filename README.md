@@ -2,7 +2,7 @@
 
 Office Studio is a local web app for your business's crew. Give the Head Executive a brief for the morning meeting, or ask a specialist to draft a client update. Each desk can use a different model. The owner reviews the draft and records a decision in the boardroom.
 
-The original 3D office and signature ampersand come from **Beyder & Co.** The mark uses the business's accent color. The sculpture glows red while the Head Executive has an alert and returns to the office color when that alert clears.
+The original 3D office and signature ampersand come from **Beyder & Co.** When the Head Executive needs a decision, the ampersand beside **Office Studio** and the sculpture in the room both turn red. They return to the business's accent color after the last executive alert clears.
 
 [Run the app](#start-locally) · [Set up a coding agent](#development)
 
@@ -15,6 +15,8 @@ The original 3D office and signature ampersand come from **Beyder & Co.** The ma
 ![The same Hudson Table crew inside the 3D office, with desks, room navigation and the Head Executive](docs/office-interior.png)
 
 **Create office** opens the built-in tower in **Overview**. Choose **Desks** to see the crew seated inside. The company name, logo, colors, and crew come from the office you just created. Hudson Table is the fictional company in this walkthrough.
+
+Use the sun and moon switch beside **New office** to change the appearance of the Studio. Dark mode also dims the 3D interior. The Studio follows your system appearance until you choose a mode, then remembers your choice in this browser at this local address.
 
 <details>
 <summary>See the saved desks, drafts and approval inbox</summary>

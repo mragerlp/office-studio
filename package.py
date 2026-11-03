@@ -8,7 +8,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parent
 FILES = (
-    "README.md", "index.html", "help.html", "style.css", "app.js", "server.py", "providers.py",
+    "README.md", "index.html", "help.html", "style.css", "app.js", "appearance.js", "server.py", "providers.py",
     "package.py", "test_office.py", "test_providers.py", ".gitignore",
     "launch.py", "configure_providers.py", "loopback_server.py", "room_preview.py", "room_theme.js", "build_runner.py",
     "Start Office Studio.cmd", "Start Office Studio.command", "Configure Providers.cmd", "Configure Providers.command",

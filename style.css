@@ -15,10 +15,30 @@
   --accent: #285b53;
   --accent-wash: #e8eeea;
   --shadow: 0 6px 28px #283d2910;
+  --field-line: #d8dcd4;
+  --placeholder: #69726b;
+  --hover: #e9eae3;
+  --focus: #a45d28;
+  --room-backdrop: #e5e8e1;
   color-scheme: light;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
   background: var(--canvas);
   color: var(--ink);
+}
+:root[data-appearance="dark"] {
+  color-scheme: dark;
+  --canvas: #171d1a;
+  --paper: #222a26;
+  --ink: #edf1eb;
+  --muted: #b4c0b6;
+  --line: #414d46;
+  --field-line: #65766b;
+  --placeholder: #a3afa6;
+  --hover: #323e36;
+  --accent-wash: #32413a;
+  --shadow: 0 6px 28px #0003;
+  --focus: #edb78d;
+  --room-backdrop: #1b221e;
 }
 * {
   box-sizing: border-box;
@@ -58,7 +78,7 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 section:focus-visible {
-  outline: 3px solid #a45d28;
+  outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
 button,
@@ -98,7 +118,7 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 22px max(30px, calc((100vw - 1400px) / 2));
+  padding: 22px max(30px, calc((100% - 1400px) / 2));
 }
 .wordmark {
   display: flex;
@@ -113,6 +133,35 @@ h3 {
   font-weight: 600;
 }
 .studio-brand { display: flex; align-items: center; gap: 6px; }
+.guide-tools, .room-tools { display: flex; align-items: center; gap: 12px; }
+.appearance-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 40px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--paper);
+  color: var(--muted);
+}
+.appearance-toggle span {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  font: 18px/1 "Segoe UI Symbol", sans-serif;
+}
+:root[data-appearance="light"] .appearance-toggle span:first-child,
+:root[data-appearance="dark"] .appearance-toggle span:last-child {
+  background: var(--ink);
+  color: var(--paper);
+}
+.room-toolbar .appearance-toggle,
+.room-full-window .masthead { display: none; }
+.room-full-window .room-toolbar .appearance-toggle { display: inline-flex; }
 .review-mark {
   display: grid; place-items: center; flex: none; width: 34px; height: 38px;
   padding: 0; border: 0; border-radius: 6px; background: var(--amp-surface, transparent); color: var(--accent);
@@ -275,15 +324,15 @@ select,
 textarea {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #d8dcd4;
-  background: #fffefa;
+  border: 1px solid var(--field-line);
+  background: var(--paper);
   color: var(--ink);
   font-size: 13px;
   min-height: 42px;
 }
 input::placeholder,
 textarea::placeholder {
-  color: #92978f;
+  color: var(--placeholder);
 }
 textarea {
   resize: vertical;
@@ -312,7 +361,7 @@ input[type="file"]::file-selector-button {
   height: 43px;
   width: 100%;
   padding: 5px;
-  background: white;
+  background: var(--paper);
   border: 1px solid var(--line);
 }
 .logo-field {
@@ -402,7 +451,7 @@ details[open] summary {
   background: transparent;
 }
 .quiet:hover {
-  background: #e9eae3;
+  background: var(--hover);
 }
 .full {
   width: 100%;
@@ -720,7 +769,7 @@ details[open] summary {
   height: 31px;
   border-radius: 50%;
   background: var(--accent-wash);
-  color: var(--accent);
+  color: var(--ink);
   font-size: 12px;
   font-weight: 600;
 }
@@ -865,6 +914,9 @@ footer > span:first-child {
   border: 0;
 }
 @media (min-width: 1600px) {
+  .masthead {
+    padding-inline: calc((100% - 1460px) / 2);
+  }
   main {
     padding-left: 0;
     padding-right: 0;
@@ -909,7 +961,7 @@ footer > span:first-child {
 }
 @media (max-width: 800px) {
   .masthead {
-    padding: 18px 22px;
+    padding: 18px 30px;
     gap: 14px;
     flex-wrap: wrap;
   }
@@ -1199,7 +1251,7 @@ footer > span:first-child {
   white-space: nowrap;
 }
 .room-frames {
-  background: #e5e8e1;
+  background: var(--room-backdrop);
   position: relative;
 }
 .room-frames:empty { min-height: clamp(580px, 72vh, 1000px); }
@@ -1208,7 +1260,7 @@ footer > span:first-child {
   width: 100%;
   height: clamp(580px, 72vh, 1000px);
   border: 0;
-  background: #e5e8e1;
+  background: var(--room-backdrop);
 }
 .room-disclosure {
   font-size: 11px;
@@ -1418,3 +1470,39 @@ footer > span:first-child {
 }
 
 .footer-tools { display: flex; align-items: center; gap: 14px; white-space: nowrap; }
+@media (max-width: 580px) {
+  .office-switch { flex-basis: 100%; }
+  .office-switch select { max-width: none; }
+}
+:root[data-appearance="dark"] .wordmark > .brand-symbol { background: #a1c9b9; }
+
+/* The desks and boardroom use the same evening palette as the app chrome. */
+:root[data-appearance="dark"] .notice.error { color: #ffbbaa; border-left-color: #ee9d87; }
+:root[data-appearance="dark"] .room {
+  border-color: var(--line);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 47px, #64736838 48px),
+    repeating-linear-gradient(90deg, #1c251f 0 47px, #46584c 48px);
+}
+:root[data-appearance="dark"] .room-window,
+:root[data-appearance="dark"] .desk::after { background: #445448; border-color: #68796a; }
+:root[data-appearance="dark"] .desk { background: var(--paper); border-color: #49594d; }
+:root[data-appearance="dark"] .desk[aria-pressed="true"] {
+  background: var(--hover);
+  outline-color: color-mix(in srgb, var(--accent) 42%, white);
+}
+:root[data-appearance="dark"] .boardroom { background: #344439; border-color: #526757; }
+:root[data-appearance="dark"] .boardroom:hover { background: #404f44; }
+:root[data-appearance="dark"] .boardroom > span:not(.table-dots),
+:root[data-appearance="dark"] .table-dots { color: var(--muted); }
+:root[data-appearance="dark"] .state-pill { color: #f2d38b; background: #493d24; }
+:root[data-appearance="dark"] .state-pill.approved { color: #bde5b4; background: #2e4430; }
+:root[data-appearance="dark"] .state-pill.declined { color: #eec7b2; background: #48382e; }
+:root[data-appearance="dark"] .review-mark:not([data-executive-alert="true"]) {
+  background: var(--dark-amp-surface, #c2d0c6);
+}
+:root[data-appearance="dark"] .review-mark[data-executive-alert="true"] {
+  background: #431f25;
+  box-shadow: inset 0 -2px #ff7278;
+}
+:root[data-appearance="dark"] .review-mark[data-executive-alert="true"] .brand-symbol { background: #ff7278; }
