@@ -45,10 +45,6 @@ jobs:
           echo 'STUDIO_WEB_ORIGIN=http://127.0.0.1:4173' > "$RUNNER_TEMP/pilot-test.env"
           supabase functions serve office-drafts --no-verify-jwt --env-file "$RUNNER_TEMP/pilot-test.env" > "$RUNNER_TEMP/pilot-edge.log" 2>&1 &
           python3 -B "$GITHUB_WORKSPACE/hosted/tests/local_stack.py"
-      - name: Exercise the built interface and the room in Chromium
-        run: |
-          npm install --prefix "$RUNNER_TEMP/pilot-browser" --no-audit --no-fund playwright@1.62.1
-          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pilot-browser/node_modules/playwright" CHROME_PATH="$(command -v google-chrome)" node hosted/tests/browser.mjs
       - name: Stop the disposable stack
         if: always()
         run: |
@@ -56,6 +52,10 @@ jobs:
             cd "$RUNNER_TEMP/pilot-stack"
             supabase stop --no-backup >/dev/null 2>&1 || true
           fi
+      - name: Exercise the built interface and the room in Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pilot-browser" --no-audit --no-fund playwright@1.62.1
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pilot-browser/node_modules/playwright" CHROME_PATH="$(command -v google-chrome)" node hosted/tests/browser.mjs
   test:
     strategy:
       matrix:

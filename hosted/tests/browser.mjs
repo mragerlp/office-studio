@@ -395,9 +395,13 @@ try {
     null,
     { timeout: 30000 },
   );
-  await room.locator("#btnBoard").click();
+  const boardButton = room.locator("#btnBoard");
+  await boardButton.waitFor({ state: "visible" });
+  await boardButton.press("Enter");
   await page.waitForFunction(() => document.activeElement?.id === "review");
-  await room.locator("#btnAdd").click();
+  const addButton = room.locator("#btnAdd");
+  await addButton.waitFor({ state: "visible" });
+  await addButton.press("Enter");
   await page.waitForFunction(() => document.activeElement?.id === "desk-name");
   assert(await el("hosted-add-desk").evaluate((details) => details.open));
   await el("desk-name").fill("Scheduling");
