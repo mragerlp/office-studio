@@ -82,6 +82,20 @@ API keys stay in the server process. A live draft sends the brief, agent instruc
 
 Provider setup references are available from [OpenAI](https://developers.openai.com/api/docs/quickstart), [Anthropic](https://platform.claude.com/docs/en/api/overview), [Google](https://ai.google.dev/gemini-api/docs/api-key), and [Meta](https://dev.meta.ai/docs/overview).
 
+## Supabase
+
+**Today.** Contributors can connect Codex to a specific Supabase project through MCP. The packaged app runs locally and stores offices in SQLite. Running the app and its tests requires no Supabase account.
+
+**Developer setup.** In PowerShell or Terminal, replace `YOUR_PROJECT_REF` with the reference for your development project and keep the URL quoted. Complete the Supabase authorization in your browser. Use `codex mcp get supabase` to inspect the configured endpoint and `codex mcp list` to check the authentication method.
+
+```sh
+codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching%2Cfeedback"
+```
+
+The project reference scopes the connection and disables account-wide tools, even with `account` in the requested groups. For a read-only review, append `&read_only=true` inside the quotes. Each contributor authorizes their own account. Keep developer tokens and privileged keys out of the browser app, repository and ZIPs. [Supabase MCP options](https://supabase.com/docs/guides/ai-tools/mcp)
+
+**Hosted edition proposal.** Use Supabase Auth for Google or Microsoft sign-in and Postgres row-level security to limit each office's desks, tasks and approvals to its members. An owner would separately authorize Gmail or Outlook access and choose which desk and model can receive a selected message. Model credentials would stay on the server. The first workflow would draft a reply for owner review inside Studio. [Google sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) · [Microsoft sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-azure) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
 ## Check and package
 
 Run the server and provider checks, then build the handoff package.
