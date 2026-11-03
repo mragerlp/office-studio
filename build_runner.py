@@ -84,7 +84,7 @@ def get(port, path):
     return request(port, path)
 
 
-def smoke_room(port):
+def smoke_room(port, asset_root=ROOT):
     """Exercise actual bundled room assets in the extracted frozen process."""
     status, raw = request(port, "/api/workspaces", {
         "name": "Fictional Native Smoke Office", "color": "#123456",
@@ -101,6 +101,10 @@ def smoke_room(port):
     status, page = get(frame.port, frame.path + "?" + frame.query)
     if status != 200 or b'async function loadPracticePack(key)' not in page or b'src="/assets/three-r128.min.js"' not in page or b'src="https://cdnjs' in page:
         raise RuntimeError("Frozen room is missing its original scene or local dependency rewrite.")
+    adapter = (asset_root / "room_theme.js").read_text(encoding="utf-8").encode()
+    script = b'<script data-office-theme-adapter="1">' + adapter + b'</script>'
+    if page.count(b'<script data-office-theme-adapter="1">') != 1 or script not in page:
+        raise RuntimeError("Bundled room_theme.js differs from the adapter served by the runner.")
     match = re.search(rb'<script type="application/json" id="office-studio-presentation">(.*?)</script>', page, re.S)
     presentation = json.loads(match[1]) if match else {}
     if presentation.get("name") != workspace["name"] or presentation.get("agents", [{}])[0].get("title") != "Head Executive":
@@ -112,6 +116,8 @@ def smoke_room(port):
     status, javascript = get(frame.port, "/assets/three-r128.min.js")
     if status != 200 or hashlib.sha256(javascript).hexdigest() != "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2":
         raise RuntimeError("Frozen room did not serve its pinned local Three.js.")
+    if javascript != (asset_root / "assets/three-r128.min.js").read_bytes():
+        raise RuntimeError("Bundled assets/three-r128.min.js differs from the served renderer.")
 
 
 def stop(process):
@@ -181,8 +187,11 @@ def smoke(target, archive):
             status, html = get(port, "/")
             if status != 200 or b"Office Studio" not in html:
                 raise RuntimeError("Frozen runner could not serve its bundled interface.")
-            if get(port, "/appearance.js") != (200, (app / "appearance.js").read_bytes()):
-                raise RuntimeError("Frozen runner did not serve the packaged appearance switch.")
+            paths = ["index.html", "help.html", "app.js", "appearance.js", "style.css", "assets/ampersand.svg"]
+            paths.extend(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))
+            for path in paths:
+                if get(port, "/" + path) != (200, (app / path).read_bytes()):
+                    raise RuntimeError(f"Bundled {path} differs from the file served by the runner.")
             status, raw = get(port, "/api/providers")
             sources = json.loads(raw)["providers"]
             if status != 200 or {p["id"] for p in sources} != {"demo", "openai", "anthropic", "gemini", "meta"}:
@@ -191,7 +200,7 @@ def smoke(target, archive):
                 raise RuntimeError("Smoke test unexpectedly inherited provider configuration.")
             if get(port, "/api/workspaces") != (200, b'{"workspaces": []}'):
                 raise RuntimeError("Smoke test did not start with isolated storage.")
-            smoke_room(port)
+            smoke_room(port, app)
             print(f"PASS: extracted frozen {target} runner, bundled UI and isolated local room, private-free ZIP and unconfigured provider list.")
         finally:
             stop(process)

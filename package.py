@@ -14,10 +14,18 @@ FILES = (
     "Start Office Studio.cmd", "Start Office Studio.command", "Configure Providers.cmd", "Configure Providers.command",
     "test_launcher.py", "test_room_preview.py", "test_room_alert.py", "test_setup.py",
     "docs/setup.png", "docs/office-interior.png", "docs/boardroom.png",
+    "examples/friday-inquiry.txt",
     "assets/ampersand.svg", "assets/OFL-Old-Standard.txt",
     "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt",
     "AGENTS.md", "MUSE.md", "GEMINI.md", "CLAUDE.md", "CODEX.md",
     "packs/re.json", "packs/law.json", "packs/acct.json", "packs/fin.json", "packs/med.json",
+    "hosted/README.md", "hosted/index.html", "hosted/style.css", "hosted/auth.js", "hosted/app.js",
+    "hosted/room-client.js", "hosted/room-view.js", "hosted/build_site.py",
+    "hosted/tests/browser.mjs", "hosted/tests/auth.test.cjs", "hosted/tests/local_stack.py", "hosted/tests/postgres-fixture.sql",
+    "supabase/config.toml", "supabase/migrations/20261103000100_office_studio_pilot.sql",
+    "supabase/tests/office_pilot.sql", "supabase/functions/office-drafts/index.ts",
+    "supabase/functions/office-drafts/handler.js", "supabase/functions/office-drafts/providers.js",
+    "supabase/functions/office-drafts/handler_test.js",
 )
 
 

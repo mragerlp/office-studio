@@ -11,6 +11,51 @@ permissions:
   contents: read
 
 jobs:
+  hosted-pilot:
+    name: Hosted sign-in, private files and approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.9.5
+      - name: Check the provider broker without external model calls
+        run: |
+          node --test hosted/tests/auth.test.cjs
+          deno check supabase/functions/office-drafts/index.ts
+          deno test supabase/functions/office-drafts/handler_test.js
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb
+        with:
+          version: 2.122.1
+      - name: Start an isolated Supabase project
+        run: |
+          mkdir -p "$RUNNER_TEMP/pilot-stack"
+          cd "$RUNNER_TEMP/pilot-stack"
+          supabase init
+          cp -R "$GITHUB_WORKSPACE/supabase/migrations" supabase/
+          cp -R "$GITHUB_WORKSPACE/supabase/functions" supabase/
+          supabase start -x studio,imgproxy,storage-api,realtime,logflare,vector,supavisor,postgres-meta,mailpit > "$RUNNER_TEMP/pilot-start.log" 2>&1 || { docker ps -a --format '{{.Image}} {{.Status}}'; exit 1; }
+      - name: Check database access rules and actual authenticated HTTP flow
+        run: |
+          cd "$RUNNER_TEMP/pilot-stack"
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' -v ON_ERROR_STOP=1 -f "$GITHUB_WORKSPACE/supabase/tests/office_pilot.sql"
+          echo 'STUDIO_WEB_ORIGIN=http://127.0.0.1:4173' > "$RUNNER_TEMP/pilot-test.env"
+          supabase functions serve office-drafts --no-verify-jwt --env-file "$RUNNER_TEMP/pilot-test.env" > "$RUNNER_TEMP/pilot-edge.log" 2>&1 &
+          python3 -B "$GITHUB_WORKSPACE/hosted/tests/local_stack.py"
+      - name: Exercise the built interface and the room in Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pilot-browser" --no-audit --no-fund playwright@1.62.1
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pilot-browser/node_modules/playwright" CHROME_PATH="$(command -v google-chrome)" node hosted/tests/browser.mjs
+      - name: Stop the disposable stack
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/pilot-stack/supabase" ]; then
+            cd "$RUNNER_TEMP/pilot-stack"
+            supabase stop --no-backup >/dev/null 2>&1 || true
+          fi
   test:
     strategy:
       matrix:

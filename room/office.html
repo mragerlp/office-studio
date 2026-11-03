@@ -13073,11 +13073,16 @@ function goLive() {
   BUS.emit('meta', OFFICE_STATE.meta);
 }
 
-async function loadPracticePack(key) {
-  if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) throw new Error('Invalid practice pack key.');
+async function readPracticePack(key) {
+  if (key === 'hosted' && window.OfficeStudioHostedRoom) return window.OfficeStudioHostedRoom.pack;
   const response = await fetch(`../../packs/${key}.json`, { mode: 'same-origin', credentials: 'omit', redirect: 'error', cache: 'no-store' });
   if (!response.ok) throw new Error(`Could not load practice pack "${key}" (HTTP ${response.status}).`);
-  const pack = await response.json();
+  return response.json();
+}
+
+async function loadPracticePack(key) {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) throw new Error('Invalid practice pack key.');
+  const pack = await readPracticePack(key);
   const text = v => typeof v === 'string' && v.trim().length > 0;
   if (pack?.feed !== 'simulated' || !text(pack.office) || !text(pack.rules) || !Array.isArray(pack.systems) ||
       !pack.systems.every(text) || !Array.isArray(pack.crew) || pack.crew[0]?.name !== 'CRIMSON' || pack.crew.length > CAST_CAP ||

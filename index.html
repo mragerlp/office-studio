@@ -460,10 +460,34 @@
                   maxlength="8000"
                   required
                   placeholder="Try: Draft a friendly opening-hours announcement for owner review. Use placeholders only."
-                ></textarea
-                ><label for="draft-provider">For this draft</label
+                ></textarea>
+                <fieldset class="working-file">
+                  <legend>Working file <span class="optional">optional</span></legend>
+                  <div id="saved-file-field" hidden>
+                    <label for="draft-file">Use a saved file</label>
+                    <select id="draft-file"><option value="">Brief only</option></select>
+                  </div>
+                  <label for="add-file">Add a text file to this office</label>
+                  <input id="add-file" type="file" accept=".txt,.md" aria-describedby="file-hint" />
+                  <p id="file-hint" class="field-note">Selecting a .txt or .md file saves it locally. Up to 32 KB.</p>
+                  <p id="file-status" class="field-note" role="status"></p>
+                  <button id="reload-files" type="button" class="button quiet" hidden>Reload files</button>
+                  <div id="file-tools" hidden>
+                    <a id="original-download" class="text-link" download>Download original</a>
+                    <details id="file-delete-options">
+                      <summary>Remove file…</summary>
+                      <p class="field-note">This removes the original from this office. Earlier drafts keep their text and source label.</p>
+                      <button id="delete-file" type="button" class="button quiet">Remove original</button>
+                    </details>
+                  </div>
+                </fieldset>
+                <label for="draft-provider">For this draft</label
                 ><select id="draft-provider" required></select>
                 <p id="provider-note" class="field-note"></p>
+                <label id="file-release" class="file-release" for="share-file" hidden>
+                  <input id="share-file" type="checkbox" />
+                  <span id="file-release-label"></span>
+                </label>
                 <button
                   id="generate-draft"
                   class="button primary full"
@@ -471,6 +495,9 @@
                 >
                   Prepare draft <span aria-hidden="true">↗</span>
                 </button>
+                <p id="draft-feedback" class="field-note" role="status"></p>
+                <button id="review-latest" class="button quiet" type="button" hidden>Review this draft</button>
+                <button id="reset-attempt" class="button quiet" type="button" hidden>Start a new attempt</button>
               </form>
               <p class="draft-disclosure">
                 Use synthetic briefs. Drafts are working text; review them
@@ -558,6 +585,7 @@
                 </div>
                 <h3 id="preview-brief"></h3>
                 <p id="preview-agent" class="field-note"></p>
+                <p id="preview-source" class="field-note" hidden></p>
                 <pre id="preview-text"></pre>
                 <div id="decision-buttons" class="button-row">
                   <button
@@ -575,6 +603,7 @@
                   </button>
                 </div>
                 <p id="decision-note" class="field-note"></p>
+                <a id="download-draft" class="button quiet" download hidden>Download approved text</a>
               </article>
             </section>
           </div>
