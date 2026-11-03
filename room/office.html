@@ -53,6 +53,8 @@ button { cursor: pointer; }
   border-bottom: 1px solid var(--rule);
 }
 .brand { display: flex; align-items: baseline; gap: calc(14 * var(--u)); white-space: nowrap; }
+#topbar .brand, #topbar .wordmark { min-width: 0; }
+#topbar .brand > :not(.wordmark), #topbar #counts, #topbar .actions { flex-shrink: 0; }
 .wordmark { font: 400 calc(21 * var(--u))/1 var(--display); letter-spacing: 0.06em; }
 .wordmark i { font-style: italic; color: var(--crimson); padding: 0 0.02em; }
 .brand .sep { width: 1px; height: calc(16 * var(--u)); background: var(--rule); align-self: center; }
@@ -392,11 +394,10 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
   .m-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .b-gate .need { display: none; }
 }
-@media (max-width: 620px) {
-  :root { --bar-h: calc(98 * var(--u)); --board-h: 54vh; }
+@media (max-width: 800px) {
+  :root { --bar-h: calc(98 * var(--u)); }
   #topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: calc(8 * var(--u)); }
-  #topbar .brand { min-width: 0; align-items: center; gap: 4px; }
-  #topbar .wordmark { min-width: 0; }
+  #topbar .brand { align-items: center; gap: 4px; }
   .wordmark { font-size: calc(19 * var(--u)); }
   #counts { margin: 0 0 0 auto; }
   .count[data-k="WORKING"] { display: none; }
@@ -404,9 +405,12 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
   .count.total { padding-left: calc(10 * var(--u)); margin-left: calc(2 * var(--u)); }
   .actions { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: calc(5 * var(--u)); }
   #viewSelect { width: 100%; min-width: 0; }
-  .actions .sp { margin-left: auto; }
+  .actions .sp { display: none; }
   .btn { padding: 0 calc(12 * var(--u)); }
   .btn .lbl-long { display: none; }
+}
+@media (max-width: 620px) {
+  :root { --board-h: 54vh; }
   .cols { grid-template-columns: 1fr; overflow-y: auto; }
   .form { grid-template-columns: 1fr; }
   .steps li { font-size: calc(9 * var(--u)); letter-spacing: 0.08em; }
