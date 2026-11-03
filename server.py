@@ -299,7 +299,7 @@ def workspace(data):
     result = {"id": uuid.uuid4().hex, "name": text(data.get("name", ""), "name", 120, required=True, label=True),
               "town": text(data.get("town", ""), "town", 100, label=True),
               "practice": text(data.get("practice", "General business"), "practice", 100, required=True, label=True),
-              "logo": logo(data.get("logo", "")), "color": data.get("color", "#a70008"),
+              "logo": logo(data.get("logo", "")), "color": data.get("color", "#000000"),
               "rules": text(data.get("rules", ""), "rules", 8000), "manualUrl": "", "drafts": []}
     if not isinstance(result["color"], str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", result["color"]):
         raise APIError("color must be a six-digit hex color.")

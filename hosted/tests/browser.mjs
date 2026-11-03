@@ -565,6 +565,15 @@ try {
     await page.locator("html").evaluate(n => getComputedStyle(n).backgroundColor),
     "rgb(60, 60, 60)",
   );
+  assert.equal(await el("create").getByLabel("Accent").inputValue(), "#000000");
+  assert.equal(
+    await el("office-mark").evaluate(n => getComputedStyle(n).backgroundColor),
+    "rgb(0, 0, 0)",
+  );
+  assert.equal(
+    await el("offices").locator("option").first().evaluate(n => getComputedStyle(n).backgroundColor),
+    "rgb(48, 48, 48)",
+  );
   const brief = "Prepare a polite reply for owner review.";
   await el("draft")
     .locator("select[name=desk]")
