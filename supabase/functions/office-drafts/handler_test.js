@@ -25,7 +25,7 @@ function fixture() {
   };
   const state = {
     user: A,
-    desk: { name: "Intake", provider: "demo", model: "" },
+    desk: { name: "Intake", specialty: "Messaging", provider: "demo", model: "" },
     connections: {},
     runs: {},
     sent: [],

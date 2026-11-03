@@ -47,7 +47,7 @@ def build_room():
     page = replace_once(page, "boot().catch(err => {", "boot().then(() => OfficeStudioHostedRoom.mounted()).catch(err => {")
     page = replace_once(page, "</body>", "<script>OfficeStudioHostedRoom.pack.then(() => {" + theme + "});</script></body>")
     # All saved work is changed in the authenticated host. The room mirrors desk status.
-    page = replace_once(page, "</head>", "<style>#btnAdd,#btnBoard,#pCompose,.p-compose{display:none!important}</style></head>")
+    page = replace_once(page, "</head>", "<style>#pCompose,.p-compose{display:none!important}</style></head>")
     return page
 
 

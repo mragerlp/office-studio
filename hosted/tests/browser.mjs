@@ -117,6 +117,13 @@ async function stub(req, res) {
     case "/rest/v1/office_studio_desks":
       return json(res, desks);
     case "/rest/v1/office_studio_files":
+      if (query.get("select") === "name,content") {
+        const match = files.find((f) => f.id === query.get("id")?.slice(3));
+        return json(
+          res,
+          match ? [{ name: match.name, content: match.content }] : [],
+        );
+      }
       return json(
         res,
         files.map(({ id, name }) => ({ id, name })),
@@ -133,6 +140,16 @@ async function stub(req, res) {
         id: body.p_id,
         name: body.p_name,
         content: body.p_content,
+      });
+      return json(res, body.p_id);
+    case "/rest/v1/rpc/office_studio_add_desk":
+      desks.push({
+        id: body.p_id,
+        name: body.p_name,
+        specialty: body.p_specialty,
+        position: desks.length + 1,
+        provider: "demo",
+        model: "",
       });
       return json(res, body.p_id);
     case "/rest/v1/rpc/office_studio_decide": {
@@ -344,7 +361,31 @@ try {
   assert.equal(sessions.size, 0);
   await chooseLogin("Google");
   const room = await create("Juniper Workshop");
-  const testSource = "Synthetic appointment inquiry for a Friday morning.";
+  const waitForFourthDesk = async () => {
+    await room
+      .locator("#rosterList")
+      .getByText("Scheduling", { exact: true })
+      .waitFor();
+    assert.equal(await room.locator("#rosterList li").count(), 4);
+  };
+  await room
+    .getByText("Ready for a file brief", { exact: true })
+    .first()
+    .waitFor();
+  await room.locator("#btnBoard").click();
+  await page.waitForFunction(() => document.activeElement?.id === "review");
+  await room.locator("#btnAdd").click();
+  await page.waitForFunction(() => document.activeElement?.id === "desk-name");
+  assert(await el("hosted-add-desk").evaluate((details) => details.open));
+  await el("desk-name").fill("Scheduling");
+  await el("desk-specialty").fill("Appointments");
+  await formButton("add-desk", "Add desk to office").click();
+  await waitForFourthDesk();
+  await page.reload();
+  await waitText("title", "Juniper Workshop");
+  await waitForFourthDesk();
+  const testSource =
+    "\uFEFFSynthetic appointment inquiry for a Friday morning.\r\n";
   const fileName = "friday-inquiry.txt";
   const upload = async (buffer) => {
     await el("upload")
@@ -356,6 +397,14 @@ try {
   await waitText("notice", "UTF-8");
   await upload(Buffer.from(testSource));
   await waitText("notice", "File saved");
+  const originalEvent = page.waitForEvent("download");
+  await el("original").click();
+  const original = await originalEvent;
+  assert.equal(original.suggestedFilename(), fileName);
+  assert.deepEqual(
+    await readFile(await original.path()),
+    Buffer.from(testSource),
+  );
   assert(
     (await room.locator("#rosterList").textContent()).includes("Legal Review"),
   );

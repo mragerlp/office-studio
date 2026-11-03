@@ -18,6 +18,7 @@
   };
   const draft = $("draft").elements, routes = $("route").elements;
   const connect = $("connect").elements;
+  let newDeskRequest;
   const labels = {
     demo: "Sample draft",
     openai: "OpenAI",
@@ -33,6 +34,10 @@
     if (rows.some((row) => row.id === selected)) node.value = selected;
   }
   function clear() {
+    newDeskRequest = null;
+    $("add-desk").reset();
+    $("hosted-add-desk").open = false;
+    $("desk-cap").textContent = "";
     state.epoch++;
     state.office = null;
     state.files = [];
@@ -65,6 +70,7 @@
     $("connect").querySelector("button").disabled = !ready || !p?.enabled;
     $("disconnect").disabled = !ready || !p?.connected;
     $("route").querySelector("button").disabled = !ready || !state.connection;
+    $("add-desk").querySelector("button").disabled = !ready || state.desks.length >= 10;
   }
   async function work(job) {
     if (state.busy) return;
@@ -202,7 +208,9 @@
     const epoch = state.epoch;
     const filter = "&office_id=eq." + o.id;
     const [desks, files, runs, connection] = await Promise.all([
-      rest("office_studio_desks?select=id,name,position,provider,model" + filter + "&order=position"),
+      rest(
+        "office_studio_desks?select=id,name,specialty,position,provider,model" + filter + "&order=position",
+      ),
       rest("office_studio_files?select=id,name,created_at" + filter + "&order=created_at.desc"),
       rest(
         "office_studio_runs?select=id,desk_id,file_id,provider,model,status,body,created_at" + filter +
@@ -212,6 +220,7 @@
     ]);
     if (epoch !== state.epoch) return;
     Object.assign(state, { desks, files, runs, connection });
+    $("desk-cap").textContent = desks.length + " of 10 desks, including Legal Review.";
     selectOptions(draft.file, files, (f) => f.name + " · " + f.id.slice(0, 8));
     selectOptions(draft.desk, desks, (d) => d.name);
     selectOptions(routes.desk, desks, (d) => d.name);
@@ -226,7 +235,7 @@
       id: o.id,
       name: o.name,
       color: o.color,
-      desks: desks.map((d) => ({ id: d.id, name: d.name })),
+      desks: desks.map((d) => ({ id: d.id, name: d.name, specialty: d.specialty })),
       pendingDeskIds: [...new Set(runs.filter((r) => r.status === "review").map((r) => r.desk_id))],
     });
     controls();
@@ -283,6 +292,29 @@
     $("create").reset();
     await loadOffices(id);
   });
+  bindForm("add-desk", async () => {
+    const f = $("add-desk").elements;
+    const name = f.namedItem("name").value.trim(), specialty = f.specialty.value.trim();
+    if (!name || !specialty) throw new Error("Enter a desk name and specialty.");
+    if (state.desks.length >= 10) throw new Error("This office already has ten desks.");
+    if (state.desks.some((d) => d.name.toLowerCase() === name.toLowerCase())) {
+      throw new Error("This office already has a desk with that name.");
+    }
+    if (!newDeskRequest || newDeskRequest.name !== name || newDeskRequest.specialty !== specialty) {
+      newDeskRequest = { id: crypto.randomUUID(), name, specialty };
+    }
+    await rpc("add_desk", {
+      p_office: state.office.id,
+      p_id: newDeskRequest.id,
+      p_name: name,
+      p_specialty: specialty,
+    });
+    await reload();
+    $("add-desk").reset();
+    $("hosted-add-desk").open = false;
+    newDeskRequest = null;
+    message("Desk added to your office.");
+  });
   bindForm("upload", async () => {
     const f = $("upload").elements.file.files[0];
     if (!f || !f.name.toLowerCase().endsWith(".txt") || f.size > 65536 || !f.size) {
@@ -303,12 +335,15 @@
     routeDestination();
     message("File saved to this office.");
   });
-  $("original").onclick = () => work(async () => {
-    const rows = await rest("office_studio_files?select=name,content&office_id=eq." + state.office.id +
-      "&id=eq." + draft.file.value);
-    if (!rows.length) throw new Error("File unavailable.");
-    download(rows[0].content, rows[0].name);
-  });
+  $("original").onclick = () =>
+    work(async () => {
+      const rows = await rest(
+        "office_studio_files?select=name,content&office_id=eq." + state.office.id +
+          "&id=eq." + draft.file.value,
+      );
+      if (!rows.length) throw new Error("File unavailable.");
+      download(rows[0].content, rows[0].name);
+    });
   $("remove").onclick = () =>
     work(async () => {
       const f = state.files.find((x) => x.id === draft.file.value);

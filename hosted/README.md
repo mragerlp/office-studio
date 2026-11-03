@@ -4,7 +4,9 @@ This is the web edition of **choose a text file → assign a desk → review its
 
 ## A first walkthrough
 
-Sign in with Google or Microsoft. Create an office with a name and color. The room opens with Head Executive, Intake and Legal Review. Upload a fictional UTF-8 text file, select it and a desk, enter a brief, then select **Prepare draft**. The default route creates a sample inside the hosted service. Review the output, record a decision, and download the approved text.
+Sign in with Google or Microsoft. Create an office with a name and color. The room opens with Head Executive, Intake and Legal Review. Select **Add a desk** to name a new desk and give it a specialty. The office holds up to ten desks including Legal Review. New desks start on the sample route.
+
+Upload a fictional UTF-8 text file, select it and a desk, enter a brief, then select **Prepare draft**. The default route creates a sample inside the hosted service. Review the output, record a decision, and download the approved text. **Download original** returns the selected source file separately.
 
 Under **Connections & desk settings**, an owner can connect OpenAI, Claude, Gemini or Meta Muse using the business's API key. Saving a key configures a route. A successful generation demonstrates that the credential can use the selected model. Choose an allowed model for a desk and save it. During drafting, the owner sees the file name, provider and model and explicitly permits the transfer. Google and Microsoft sign-in grant identity access. Mailbox connections and consumer-subscription billing are separate.
 

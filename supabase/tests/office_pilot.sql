@@ -21,6 +21,23 @@ do $$begin
     raise exception 'Credential table readable'; exception when insufficient_privilege then null; end;
   begin insert into public.office_studio_members values(current_setting('test.office_a')::uuid,auth.uid());
     raise exception 'Self-enrollment permitted'; exception when insufficient_privilege then null; end;
+  begin perform public.office_studio_add_desk(current_setting('test.office_a')::uuid,gen_random_uuid(),'Other desk','Wrong office');
+    raise exception 'Cross-office desk creation succeeded'; exception when insufficient_privilege then null; end;
+end$$;
+do $$declare b uuid:=current_setting('test.office_b')::uuid; new_id uuid:=gen_random_uuid(); i integer;
+begin
+  perform public.office_studio_add_desk(b,new_id,'Scheduling','Appointment requests');
+  perform public.office_studio_add_desk(b,new_id,'Scheduling','Appointment requests');
+  if (select count(*) from public.office_studio_desks)<>4 or not exists (
+      select 1 from public.office_studio_desks where id=new_id and office_id=b and name='Scheduling'
+        and position=4 and provider='demo') then raise exception 'Desk insert or retry failed';end if;
+  begin perform public.office_studio_add_desk(b,gen_random_uuid(),' scheduling ','Backlog');
+    raise exception 'Duplicate name accepted'; exception when unique_violation then null;end;
+  for i in 5..10 loop perform public.office_studio_add_desk(b,gen_random_uuid(),'Desk '||i,'Operations');end loop;
+  begin perform public.office_studio_add_desk(b,gen_random_uuid(),'Overflow','Operations');
+    raise exception 'Eleventh desk allowed';exception when raise_exception then
+     if sqlerrm <> 'The office already has ten desks' then raise;end if;end;
+  if (select count(*) from public.office_studio_desks where name='Legal Review')<>1 then raise exception 'Legal seat lost';end if;
 end$$;
 reset role;
 set local role service_role;

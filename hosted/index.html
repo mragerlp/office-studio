@@ -22,6 +22,10 @@
 <label>Accent<input name="color" type="color" value="#285b53"></label><button>Create office</button></form>
 <section id="workspace" hidden><p class="eyebrow">YOUR OFFICE SUITE</p><h1 class="workspace-title" id="title"></h1>
 <iframe id="office-room" title="3D Office Suite" sandbox="allow-scripts" hidden></iframe>
+<details id="hosted-add-desk"><summary>Add a desk</summary>
+<form id="add-desk"><label>Desk name<input id="desk-name" name="name" maxlength="60" required placeholder="Scheduling"></label>
+<label>Specialty<input id="desk-specialty" name="specialty" maxlength="120" required placeholder="Appointment requests"></label>
+<small id="desk-cap"></small><button>Add desk to office</button></form></details>
 <div class="columns"><div>
 <form id="upload"><p class="eyebrow">01 / FILES</p><h2>Bring a file</h2><label>Choose a text file<input name="file" type="file" accept=".txt,text/plain" required></label>
 <small>Plain UTF-8 text up to 64 KiB. Your office stores the original separately from drafts.</small><button>Save file to office</button></form>
@@ -39,5 +43,6 @@
 <button>Save connection</button><button id="disconnect" type="button" class="quiet">Disconnect</button></form>
 <p id="connection-status"></p><form id="route"><label>Desk<select name="desk"></select></label><label>Model<select name="model"></select></label><button>Save desk route</button></form></details></div></div>
 </section></section></main>
-<footer>Office Studio · <a href="https://www.beyderco.com/" rel="noreferrer" target="_blank">Beyder &amp; Co.</a></footer>
+<footer>Office Studio · <a href="https://www.beyderco.com/" rel="noreferrer" target="_blank">Beyder &amp; Co.</a>
+<a id="hosted-help" href="https://manual.beyderco.com/" rel="noreferrer" target="_blank">Help ↗</a></footer>
 </body></html>

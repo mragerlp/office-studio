@@ -93,6 +93,10 @@
         "Office inbox status. Open a draft in the workspace to review it.";
       OFFICE_STATE.meta.feed = "hosted";
       UI.renderFeed();
+      UI.toggleBoard = (open) => {
+        if (open !== false) parent.postMessage({ type: "studio:open-board" }, origin);
+      };
+      UI.openAdd = () => parent.postMessage({ type: "office-studio:add-agent" }, origin);
       mounted = true;
       refresh();
       parent.postMessage({ type: "studio:room-ready" }, origin);

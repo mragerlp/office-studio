@@ -87,12 +87,18 @@
     send();
   }
   window.addEventListener("message", (e) => {
-    if (
-      e.origin !== "null" || e.source !== frame()?.contentWindow ||
-      e.data?.type !== "studio:room-ready"
-    ) return;
-    ready = true;
-    send();
+    if (e.origin !== "null" || e.source !== frame()?.contentWindow || !office) return;
+    if (e.data?.type === "studio:room-ready") {
+      ready = true;
+      send();
+    } else if (e.data?.type === "studio:open-board") {
+      document.getElementById("review").focus();
+    } else if (e.data?.type === "office-studio:add-agent") {
+      document.getElementById("hosted-add-desk").open = true;
+      document.getElementById("desk-name").focus();
+    } else if (e.data?.type === "office-studio:open-manual") {
+      document.getElementById("hosted-help").focus();
+    }
   });
   window.OfficeStudioRoom = { show, clear };
   window.addEventListener("office-studio:appearance", send);

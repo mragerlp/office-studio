@@ -19,13 +19,15 @@ alter table public.office_studio_offices add constraint office_studio_owner_is_m
 create table public.office_studio_desks (
   id uuid primary key default gen_random_uuid(),
   office_id uuid not null references public.office_studio_offices on delete cascade,
-  name text not null,
-  position smallint not null,
+  name text not null check (length(trim(name)) between 1 and 60 and name !~ '[[:cntrl:]]'),
+  specialty text not null check (length(trim(specialty)) between 1 and 120 and specialty !~ '[[:cntrl:]]'),
+  position smallint not null check (position between 1 and 10),
   provider text not null default 'demo' check (provider in ('demo','openai','anthropic','gemini','meta')),
   model text not null default '',
   unique (office_id, position), unique (office_id, id),
   check ((provider = 'demo' and model = '') or (provider <> 'demo' and length(model) between 1 and 120))
 );
+create unique index office_studio_desk_names on public.office_studio_desks(office_id,lower(trim(name)));
 create table public.office_studio_files (
   id uuid not null,
   office_id uuid not null references public.office_studio_offices on delete cascade,
@@ -108,10 +110,27 @@ begin
   end if;
   insert into public.office_studio_offices(name,color,owner_id) values (trim(p_name),p_color,uid) returning id into oid;
   insert into public.office_studio_members values (oid,uid);
-  insert into public.office_studio_desks(office_id,name,position) values
-    (oid,'Head Executive',1),(oid,'Intake',2),(oid,'Legal Review',3);
+  insert into public.office_studio_desks(office_id,name,specialty,position) values
+    (oid,'Head Executive','Chief of Staff',1),(oid,'Intake','Intake and follow-up',2),(oid,'Legal Review','Legal Review',3);
   return oid;
 end $$;
+
+create function public.office_studio_add_desk(p_office uuid, p_id uuid, p_name text, p_specialty text)
+returns uuid language plpgsql security definer set search_path='' as $$
+declare next_position smallint;
+begin
+  if not exists(select 1 from public.office_studio_offices where id=p_office and owner_id=auth.uid() for update)
+    then raise exception 'Office unavailable' using errcode='42501'; end if;
+  if exists(select 1 from public.office_studio_desks where office_id=p_office and id=p_id
+    and name=trim(p_name) and specialty=trim(p_specialty)) then return p_id; end if;
+  select coalesce(max(position),0)+1 into next_position from public.office_studio_desks where office_id=p_office;
+  if next_position>10 then raise exception 'The office already has ten desks'; end if;
+  insert into public.office_studio_desks(office_id,id,name,specialty,position)
+    values(p_office,p_id,trim(p_name),trim(p_specialty),next_position);
+  return p_id;
+end $$;
+revoke all on function public.office_studio_add_desk(uuid,uuid,text,text) from public,anon,authenticated;
+grant execute on function public.office_studio_add_desk(uuid,uuid,text,text) to authenticated;
 
 create function public.office_studio_upload(p_office uuid, p_id uuid, p_name text, p_content text)
 returns uuid language plpgsql security definer set search_path='' as $$
