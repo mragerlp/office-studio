@@ -425,12 +425,12 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
 /* The embedding Studio passes the appearance separately from agent colors. */
 :root[data-appearance="dark"] {
     color-scheme: dark;
-    --paper: #202624;
-    --ink: #f0f3ee;
-    --charcoal: #d7e0d8;
-    --mist: #b4c0b7;
-    --fog: #303a35;
-    --rule: #515d55;
+    --paper: #303030;
+    --ink: #f1f1f1;
+    --charcoal: #dedede;
+    --mist: #c4c4c4;
+    --fog: #424242;
+    --rule: #5b5b5b;
     --crimson: #ff8085;
     --shadow: 0 1px 3px #0004, 0 12px 36px #0005;
 }
@@ -442,8 +442,8 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
 :root[data-appearance="dark"] :is(.views button[aria-pressed="true"], .btn.ink, .btn[aria-pressed="true"], .toast) {
     background: var(--ink); color: var(--paper);
 }
-:root[data-appearance="dark"] .btn.ink:hover { background: #c6d2c8; }
-:root[data-appearance="dark"] .tile.light { color: #17231c; }
+:root[data-appearance="dark"] .btn.ink:hover { background: #cecece; }
+:root[data-appearance="dark"] .tile.light { color: #202020; }
 :root[data-appearance="dark"] :is(.bubble.wait, .tile.wait) { background: #b40c18; border-color: #b40c18; }
 :root[data-appearance="dark"] .bubble.wait .dot { color: #a70008; }
 :root[data-appearance="dark"] #gate { border-color: var(--rule); }
@@ -13073,11 +13073,16 @@ function goLive() {
   BUS.emit('meta', OFFICE_STATE.meta);
 }
 
-async function loadPracticePack(key) {
-  if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) throw new Error('Invalid practice pack key.');
+async function readPracticePack(key) {
+  if (key === 'hosted' && window.OfficeStudioHostedRoom) return window.OfficeStudioHostedRoom.pack;
   const response = await fetch(`../../packs/${key}.json`, { mode: 'same-origin', credentials: 'omit', redirect: 'error', cache: 'no-store' });
   if (!response.ok) throw new Error(`Could not load practice pack "${key}" (HTTP ${response.status}).`);
-  const pack = await response.json();
+  return response.json();
+}
+
+async function loadPracticePack(key) {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) throw new Error('Invalid practice pack key.');
+  const pack = await readPracticePack(key);
   const text = v => typeof v === 'string' && v.trim().length > 0;
   if (pack?.feed !== 'simulated' || !text(pack.office) || !text(pack.rules) || !Array.isArray(pack.systems) ||
       !pack.systems.every(text) || !Array.isArray(pack.crew) || pack.crew[0]?.name !== 'CRIMSON' || pack.crew.length > CAST_CAP ||
@@ -17422,6 +17427,7 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;
 /** Words for a state, shared by bubbles, roster and panel. */
 function stateWords(a) {
   if (a.status === 'WAITING') return { cls: 'wait', text: 'Needs you' };
+  if (OFFICE_STATE.meta.feed === 'hosted' && a.status === 'IDLE') return { cls: 'idle', text: 'Idle' };
   if (a.location === 'arriving') return { cls: 'idle', text: 'Arriving' };
   if (a.paused) return { cls: 'paused', text: 'Paused', long: 'Paused by design' };
   if (a.location === 'walking') {
@@ -17497,6 +17503,8 @@ const currentTask = id => OFFICE_STATE.tasks.filter(t => t.agentId === id && t.c
 
 /** Second line of a crew row: what the agent is doing, in plain words. */
 function rosterLine(a) {
+  // A walk through the room does not change a hosted desk's saved work state.
+  if (OFFICE_STATE.meta.feed === 'hosted') return { text: a.detail, quiet: a.status === 'IDLE' };
   if (a.status === 'WAITING') {
     const g = OFFICE_STATE.approvals.find(x => x.agentId === a.id);
     if (g) return { text: g.need };

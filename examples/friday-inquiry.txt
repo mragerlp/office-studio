@@ -1,0 +1,5 @@
+Fictional inquiry for the Office Studio walkthrough
+
+A customer would like to visit on Friday afternoon. They have not given a time.
+Please prepare a short reply asking for their preferred time. The office has
+not checked its calendar yet, so the reply should leave availability unconfirmed.

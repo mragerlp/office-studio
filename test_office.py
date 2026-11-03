@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 from collections import deque
 import http.client
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ import sys
 import tempfile
 import time
 import threading
+import uuid
 import unittest
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -343,6 +345,192 @@ class OfficeHTTPTests(unittest.TestCase):
         self.stop_server()
         self.start_server()
         self.assertEqual(self.request("GET", f"/api/workspaces/{legacy['id']}")[1], legacy)
+
+
+class FileHandoffTests(unittest.TestCase):
+    """Black-box checks of scoped files, explicit dispatch, retry, decision and output."""
+    request = OfficeHTTPTests.request
+    create = OfficeHTTPTests.create
+    restaurant = OfficeHTTPTests.restaurant
+
+    def setUp(self):
+        self.storage = tempfile.TemporaryDirectory(prefix="office-file-handoff-")
+        self.addCleanup(self.storage.cleanup)
+        self.start_server()
+        self.addCleanup(self.stop_server)
+        self.a = "/api/workspaces/" + self.create()["id"]
+        self.b = "/api/workspaces/" + self.create(self.restaurant(name="Studio Two"))["id"]
+
+    def start_server(self):
+        import server
+        self.httpd = server.create_server(0, self.storage.name)
+        self.worker = threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
+        self.worker.start()
+        self.base = f"http://127.0.0.1:{self.httpd.server_port}"
+
+    def stop_server(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.worker.join(timeout=5)
+
+    def upload(self, office, contents, name="inquiry.txt"):
+        status, result = self.request("POST", office + "/files", {"name": name, "content": contents})
+        self.assertEqual(status, 201, result)
+        file = result["file"]
+        self.assertEqual(set(file), {"id", "name", "size", "version"})
+        self.assertEqual(file["version"], hashlib.sha256(contents.encode()).hexdigest())
+        self.assertEqual(file["size"], len(contents.encode()))
+        return file
+
+    def job(self, file, **extras):
+        return {"fileId": file["id"], "fileVersion": file["version"], "requestId": str(uuid.uuid4()),
+                "provider": "demo", "model": "", "agent": "CRIMSON", "brief": "Draft a welcome.", **extras}
+
+    def test_scoped_originals_approval_and_download(self):
+        import providers
+        original = "\ufeffA fictional Friday inquiry.\r\nA second line.\n"
+        first = self.upload(self.a, original)
+        second = self.upload(self.b, "Unrelated synthetic inquiry")
+        file_path = "/files/" + first["id"]
+        self.assertEqual(self.request("GET", self.a + "/files"), (200, {"files": [first]}))
+        self.assertEqual(self.request("GET", self.b + "/files"), (200, {"files": [second]}))
+        self.assertEqual(self.request("GET", self.b + file_path + "/download")[0], 404)
+        self.assertEqual(self.request("POST", self.b + file_path + "/delete", {})[0], 404)
+        self.assertEqual(self.request("GET", self.a + file_path + "/download"), (200, original))
+        job = self.job(first)
+        with patch.object(providers, "_post") as live:
+            self.assertEqual(self.request("POST", self.b + "/drafts", job)[0], 404)
+            self.assertEqual(self.request("POST", self.a + "/drafts", {**job, "fileVersion": second["version"]})[0], 409)
+            status, item = self.request("POST", self.a + "/drafts", job)
+            self.assertEqual(status, 201, item)
+            draft, = item["drafts"]
+            self.assertEqual((draft["source"], draft["brief"], draft["status"]), (first, job["brief"], "pending"))
+            self.assertEqual(draft["requestId"], job["requestId"])
+            self.assertNotEqual(draft["text"], original)
+            self.assertEqual(self.request("POST", self.a + "/drafts", job), (200, item))
+            self.assertEqual(self.request("POST", self.a + "/drafts", {**job, "brief": "Changed."})[0], 409)
+            live.assert_not_called()
+        path = "/drafts/" + draft["id"]
+        self.assertEqual(self.request("GET", self.a + path + "/download")[0], 409)
+        self.assertEqual(self.request("POST", self.b + path + "/decision", {"decision": "approved"})[0], 404)
+        self.assertEqual(self.request("POST", self.a + path + "/decision", {"decision": "approved"})[0], 200)
+        self.assertEqual(self.request("GET", self.b + path + "/download")[0], 404)
+        self.assertEqual(self.request("POST", self.a + file_path + "/delete", {}), (200, {"files": []}))
+        self.assertEqual(self.request("GET", self.a + file_path + "/download")[0], 404)
+        self.assertEqual(self.request("POST", self.a + "/drafts", self.job(first))[0], 404)
+        self.assertEqual(self.request("GET", self.a + path + "/download"), (200, draft["text"]))
+        self.assertEqual(self.request("GET", self.b + "/files"), (200, {"files": [second]}))
+
+    def test_reject_path_binary_oversize_and_cross_origin(self):
+        for name in ("../gone.txt", r"C:\test.md", "x.txt.exe", "x.html", "NUL.txt", "a\u202etxt.md", ".hidden.md"):
+            self.assertEqual(self.request("POST", self.a + "/files", {"name": name, "content": "test"})[0], 400, name)
+        for value in ("", "  ", "header\x00body", "\ud800", "\x7f"):
+            self.assertEqual(self.request("POST", self.a + "/files", {"name": "a.md", "content": value})[0], 400)
+        too_big = "é" * 16385
+        self.assertEqual(self.request("POST", self.a + "/files", {"name": "a.txt", "content": too_big})[0], 413)
+        self.assertEqual(self.request("POST", self.a + "/files", {"name": "a.md", "content": "OK"},
+                                      {"Origin": "https://example.invalid"})[0], 403)
+        self.assertEqual(self.request("GET", self.a + "/files"), (200, {"files": []}))
+
+    def test_approved_file_handoff_and_retry_survive_restart(self):
+        import providers
+        original = "A fictional inquiry."
+        source = self.upload(self.a, original)
+        job = self.job(source)
+        status, item = self.request("POST", self.a + "/drafts", job)
+        self.assertEqual(status, 201, item)
+        draft, = item["drafts"]
+        path = self.a + "/drafts/" + draft["id"]
+        self.assertEqual(self.request("POST", path + "/decision", {"decision": "approved"})[0], 200)
+        self.stop_server()
+        self.start_server()
+        with patch.object(providers, "generate_draft") as generate:
+            self.assertEqual(self.request("GET", self.a + "/files/" + source["id"] + "/download"), (200, original))
+            self.assertEqual(self.request("GET", path + "/download"), (200, draft["text"]))
+            status, replay = self.request("POST", self.a + "/drafts", job)
+            self.assertEqual(status, 200, replay)
+            saved, = replay["drafts"]
+            self.assertEqual((saved["id"], saved["source"], saved["status"]), (draft["id"], source, "approved"))
+            generate.assert_not_called()
+
+    def test_only_selected_version_reaches_explicit_live_route(self):
+        import providers
+        content = "Selected fictional input." + "x" * 900 + "Last character."
+        selected = self.upload(self.a, content)
+        self.upload(self.a, "unselected office material", name="memo.md")
+        self.upload(self.b, "other office material")
+        job = self.job(selected, provider="openai", model="model-fixture")
+        with patch.dict(os.environ, {"OFFICE_OPENAI_MODEL": "model-fixture", "OPENAI_API_KEY": "synthetic"}, clear=True), \
+             patch.object(providers, "_post", return_value={"output": [{"type": "message", "content": [
+                 {"type": "output_text", "text": "Draft response."}]}]}) as call:
+            for invalid in (job, {**job, "shareFile": "true"}, {**job, "shareFile": True, "model": ""},
+                            {**job, "shareFile": True, "agent": "Missing"}):
+                self.assertGreaterEqual(self.request("POST", self.a + "/drafts", invalid)[0], 400)
+            call.assert_not_called()
+            status, item = self.request("POST", self.a + "/drafts", {**job, "shareFile": True})
+            self.assertEqual(status, 201, item)
+            self.assertEqual(call.call_count, 1)
+            host, _, _, payload = call.call_args.args
+            self.assertEqual((host, payload["model"]), ("api.openai.com", "model-fixture"))
+            self.assertIn(content, payload["input"])
+            self.assertIn("untrusted reference", payload["instructions"])
+            self.assertNotIn("unselected office material", str(payload))
+            self.assertNotIn("other office material", str(payload))
+            self.assertNotIn(content, json.dumps(item))
+            draft, = item["drafts"]
+            self.assertEqual(draft["model"], "model-fixture")
+            path = self.a + "/drafts/" + draft["id"]
+            self.assertEqual(self.request("POST", path + "/decision", {"decision": "declined"})[0], 200)
+            self.assertEqual(self.request("GET", path + "/download")[0], 409)
+
+    def test_uncertain_provider_failure_does_not_run_twice(self):
+        import providers
+        file = self.upload(self.a, "Example material")
+        job = self.job(file, provider="openai", model="model-fixture", shareFile=True)
+        url = self.a + "/drafts"
+        with patch.dict(os.environ, {"OFFICE_OPENAI_MODEL": "model-fixture", "OPENAI_API_KEY": "synthetic"}, clear=True), \
+             patch.object(providers, "_post", side_effect=providers.ProviderError("Provider timed out.")) as call:
+            status, response = self.request("POST", url, job)
+            self.assertEqual((status, response["code"]), (502, "draft_attempt_failed"))
+            status, replay = self.request("POST", url, job)
+            self.assertEqual((status, replay["code"]), (409, "draft_attempt_failed"))
+            self.assertEqual(self.request("GET", self.a)[1]["drafts"], [])
+            self.assertEqual(call.call_count, 1)
+            call.side_effect = None
+            call.return_value = {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Retry result"}]}]}
+            status, item = self.request("POST", url, {**job, "requestId": str(uuid.uuid4())})
+            self.assertEqual(status, 201, item)
+            self.assertEqual(len(item["drafts"]), 1)
+
+    def test_overlapping_retry_and_deletion_during_generation(self):
+        import providers
+        for remove in (False, True):
+            with self.subTest(remove=remove):
+                file = self.upload(self.b if remove else self.a, "Fictional handoff")
+                office = self.b if remove else self.a
+                job = self.job(file)
+                started, release, responses = threading.Event(), threading.Event(), []
+                def held(*args, **kwargs):
+                    started.set()
+                    if not release.wait(6):
+                        raise RuntimeError("Timed out waiting for test release")
+                    return "Draft from a slow provider"
+                with patch.object(providers, "generate_draft", side_effect=held) as call:
+                    t = threading.Thread(target=lambda: responses.append(
+                        self.request("POST", office + "/drafts", job, timeout=8)))
+                    t.start()
+                    try:
+                        self.assertTrue(started.wait(3))
+                        status, repeat = self.request("POST", office + "/drafts", job)
+                        self.assertEqual((status, repeat["code"]), (409, "draft_attempt_started"))
+                        if remove:
+                            self.assertEqual(self.request("POST", office + "/files/" + file["id"] + "/delete", {})[0], 200)
+                    finally:
+                        release.set()
+                        t.join(timeout=5)
+                    self.assertEqual(call.call_count, 1)
+                    self.assertEqual(responses[0][0], 404 if remove else 201)
+                    self.assertEqual(len(self.request("GET", office)[1]["drafts"]), 0 if remove else 1)
 
 
 class LoopbackBindingTests(unittest.TestCase):

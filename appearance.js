@@ -11,7 +11,7 @@
   function apply() {
     const dark = choice === "dark" || (choice !== "light" && system.matches);
     root.dataset.appearance = dark ? "dark" : "light";
-    meta.content = dark ? "#171d1a" : "#f5f3ed";
+    meta.content = dark ? "#3c3c3c" : "#f5f3ed";
     for (const control of document.querySelectorAll("[data-appearance-toggle]")) {
       control.setAttribute("aria-checked", String(dark));
       control.title = dark ? "Switch to light mode" : "Switch to dark mode";

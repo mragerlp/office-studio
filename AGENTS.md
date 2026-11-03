@@ -33,6 +33,7 @@ The launcher prints its actual loopback address. For isolated development, pass 
 | Local HTTP, validation, and SQLite storage | `server.py`, `loopback_server.py` |
 | Provider adapters and terminal configuration | `providers.py`, `configure_providers.py` |
 | Built-in 3D office, isolated room server and branding | `room/office.html`, `room_preview.py`, `room_theme.js`, `assets/three-r128.min.js` |
+| Hosted file pilot, setup and access tests | [hosted/README.md](hosted/README.md), `hosted/`, `supabase/` |
 | Launching and packaging | `launch.py`, platform launchers, `package.py`, `build_runner.py` |
 | Repeatable checks | `test_*.py`, `.github/workflows/` |
 
@@ -49,7 +50,7 @@ The launcher prints its actual loopback address. For isolated development, pass 
 
 ## Protect private material
 
-For Supabase development access and the proposed hosted architecture, follow the [Supabase section in the README](README.md#supabase). Use a scoped development project and synthetic fixtures. Developer MCP authorization belongs to the contributor. Customer sign-in, mailbox access and model-provider access each need their own grant.
+For Supabase development access and the hosted pilot, follow the [Supabase section in the README](README.md#supabase). Use a scoped development project and synthetic fixtures. Developer MCP authorization belongs to the contributor. Customer sign-in, mailbox access and model-provider access each need their own grant. The hosted renderer accepts desk display data and review flags only. Keep file contents, credentials, and session tokens in the authenticated host and server paths.
 
 Use fictional business information in fixtures, screenshots, documentation, and public packages. Do not commit credentials, environment files, local databases, customer records, uploaded tenant logos, private manuals, or private room overrides.
 
