@@ -8,6 +8,13 @@
   const key = config.publishableKey || "";
   const prefix = "office-pilot:" + url + ":";
   const callback = location.origin + location.pathname;
+  const identityScopes = new Map([
+    ["google", "openid email profile"],
+    ["azure", "email"],
+    ["apple", null], // Supabase's Apple provider supplies its own scopes and form_post callback.
+  ]);
+  if (config.chatgptSignIn === true) identityScopes.set("custom:chatgpt", "openid profile email");
+  const supportsLogin = (provider) => identityScopes.has(provider);
   let refreshPending;
   let generation = 0;
   function read(name) {
@@ -61,7 +68,7 @@
   const base64url = (bytes) =>
     btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
   async function login(provider) {
-    if (!["google", "azure"].includes(provider)) throw new Error("Unknown sign-in provider.");
+    if (!supportsLogin(provider)) throw new Error("Unknown sign-in provider.");
     const verifier = base64url(crypto.getRandomValues(new Uint8Array(64)));
     const challenge = base64url(
       new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))),
@@ -73,8 +80,9 @@
       redirect_to: callback,
       code_challenge: challenge,
       code_challenge_method: "s256",
-      scopes: provider === "azure" ? "email" : "openid email profile",
     });
+    const scopes = identityScopes.get(provider);
+    if (scopes) target.searchParams.set("scopes", scopes);
     location.assign(target.href);
   }
   async function init() {
@@ -168,5 +176,5 @@
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   }
-  window.HostedAuth = { init, login, logout, request };
+  window.HostedAuth = { init, login, logout, request, supportsLogin };
 })();

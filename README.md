@@ -6,6 +6,12 @@ The original 3D office and signature ampersand come from **Beyder & Co.** When t
 
 [Run the local app](#start-locally) · [Try the file walkthrough](#give-a-desk-a-file) · [Set up the hosted pilot](hosted/README.md) · [Contributor guide](AGENTS.md)
 
+## Ways to open Office Studio
+
+The hosted site builds a `get.html` page with three choices: **macOS download**, **Windows download**, and **Chrome web app**. The web app opens the shared office at the same site. Supply the public Mac and Windows release URLs with `hosted/build_site.py --macos-download URL --windows-download URL`; a download becomes clickable only when its URL is configured. Publish reviewed public packages. Igor’s private presentation ZIP is a separate handoff.
+
+On Windows x64, extract the complete ZIP and double-click **Start Office Studio.cmd** for an office saved on this computer. **Open Office Studio Online.cmd** opens the operator’s hosted site in the default browser. Configure `OFFICE_STUDIO_ONLINE_URL` to that site's exact HTTPS address. Hosted sign-in opens the shared office; existing local SQLite offices do not sync automatically.
+
 ### 1. Set up the office
 
 ![Hudson Table setup with the office name, business template and brand accent](docs/setup.png)
@@ -104,7 +110,7 @@ codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJ
 
 The project reference scopes the connection and disables account-wide tools, even with `account` in the requested groups. For a read-only review, append `&read_only=true` inside the quotes. Each contributor authorizes their own account. Keep developer tokens and privileged keys out of the browser app, repository and ZIPs. [Supabase MCP options](https://supabase.com/docs/guides/ai-tools/mcp)
 
-**Business account and connections.** Google or Microsoft signs the owner into the hosted office. A separate server-side API connection authorizes live drafting for each desk. Gmail and Outlook mailbox access, consumer subscription sign-in for models, and customer billing are future work. [Google sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) · [Microsoft sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-azure) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+**Business account and connections.** The hosted sign-in flow supports Apple, Google (including Gmail accounts), and Microsoft (including Outlook accounts when enabled by the tenant). Continue with ChatGPT is an opt-in partner integration requiring registration and a verified staging configuration. A separate server-side API connection authorizes live drafting for each desk. Gmail and Outlook mailbox access, consumer subscription sign-in for models, and customer billing are future work. [Google sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) · [Microsoft sign-in](https://supabase.com/docs/guides/auth/social-sign-in/auth-azure) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 
 ## Check and package
 

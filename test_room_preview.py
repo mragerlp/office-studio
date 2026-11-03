@@ -207,6 +207,9 @@ class RoomPreviewTests(unittest.TestCase):
             self.assertEqual(bundle.read("office-studio/room/office.html"), (server.ROOT / "room" / "office.html").read_bytes())
             self.assertEqual(bundle.read("office-studio/assets/three-r128.min.js"), (server.ROOT / "assets" / "three-r128.min.js").read_bytes())
             self.assertIn("office-studio/assets/three-LICENSE.txt", bundle.namelist())
+            self.assertEqual(bundle.read("office-studio/Open Office Studio Online.cmd"),
+                             (server.ROOT / "Open Office Studio Online.cmd").read_bytes())
+            self.assertIn("office-studio/hosted/get.html", bundle.namelist())
             self.assertNotIn("office-studio/private-room.html", bundle.namelist())
 
     def test_routes_queries_hosts_and_workspace_boundaries_fail_closed(self):
