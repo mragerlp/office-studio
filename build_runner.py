@@ -49,7 +49,7 @@ def check_binary(path, target):
 def build(target, output):
     check_platform(target)
     # Keep the data allowlist separate from the broader source handoff list.
-    assets = ["index.html", "help.html", "app.js", "style.css", "room_theme.js", "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
+    assets = ["index.html", "help.html", "app.js", "appearance.js", "style.css", "room_theme.js", "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="office-freeze-") as scratch:
@@ -181,6 +181,8 @@ def smoke(target, archive):
             status, html = get(port, "/")
             if status != 200 or b"Office Studio" not in html:
                 raise RuntimeError("Frozen runner could not serve its bundled interface.")
+            if get(port, "/appearance.js") != (200, (app / "appearance.js").read_bytes()):
+                raise RuntimeError("Frozen runner did not serve the packaged appearance switch.")
             status, raw = get(port, "/api/providers")
             sources = json.loads(raw)["providers"]
             if status != 200 or {p["id"] for p in sources} != {"demo", "openai", "anthropic", "gemini", "meta"}:

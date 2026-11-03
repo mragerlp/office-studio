@@ -244,7 +244,7 @@ class OfficeHTTPTests(unittest.TestCase):
             self.assertEqual(self.request("GET", route)[0], 404, route)
 
     def test_normal_static_routes_and_provider_status(self):
-        for route in ("/", "/index.html", "/help.html", "/app.js", "/style.css", "/assets/ampersand.svg", "/packs/re.json", "/packs/law.json", "/packs/acct.json", "/packs/fin.json", "/packs/med.json"):
+        for route in ("/", "/index.html", "/help.html", "/app.js", "/appearance.js", "/style.css", "/assets/ampersand.svg", "/packs/re.json", "/packs/law.json", "/packs/acct.json", "/packs/fin.json", "/packs/med.json"):
             status, body = self.request("GET", route)
             self.assertEqual(status, 200, route)
             self.assertTrue(body, route)

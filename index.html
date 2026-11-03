@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#f5f3ed" />
     <title>Office Studio</title>
     <link rel="icon" href="/assets/ampersand.svg" />
+    <script src="/appearance.js"></script>
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
   </head>
@@ -35,6 +36,10 @@
           <option value="">Choose an Office Suite</option></select
         ><button id="new-office" class="button quiet" type="button">
           + New office
+        </button>
+        <button id="appearance-toggle" class="appearance-toggle" type="button"
+          role="switch" aria-label="Dark mode" aria-checked="false" data-appearance-toggle>
+          <span aria-hidden="true">☀</span><span aria-hidden="true">☾</span>
         </button>
       </div>
     </header>
@@ -245,14 +250,20 @@
               <p class="eyebrow">INSIDE YOUR OFFICE SUITE</p>
               <h2 id="room-title" tabindex="-1">Inside your office</h2>
             </div>
-            <a
-              id="room-full-tab"
-              class="button quiet"
-              target="_blank"
-              rel="noopener noreferrer"
-              hidden
-              >Open room in full tab ↗</a
-            >
+            <div class="room-tools">
+              <a
+                id="room-full-tab"
+                class="button quiet"
+                target="_blank"
+                rel="noopener noreferrer"
+                hidden
+                >Open room in full tab ↗</a
+              >
+              <button id="room-appearance-toggle" class="appearance-toggle" type="button"
+                role="switch" aria-label="Dark mode" aria-checked="false" data-appearance-toggle>
+                <span aria-hidden="true">☀</span><span aria-hidden="true">☾</span>
+              </button>
+            </div>
           </div>
           <div id="room-frames" class="room-frames"></div>
           <p id="room-disclosure" class="room-disclosure">

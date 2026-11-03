@@ -30,6 +30,7 @@ const state = {
   rooms: new Map(),
   roomFrame: null,
   roomFrameId: "",
+  roomExecutivePending: false,
   addingFromRoom: false,
 };
 const genericPack = {
@@ -316,11 +317,15 @@ function applyAccent(value) {
   const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
   document.documentElement.style.setProperty(
     "--amp-surface",
-    luminance > 0.58 ? "#304138" : "transparent",
+    luminance > 0.26 ? "#203026" : "transparent",
+  );
+  document.documentElement.style.setProperty(
+    "--dark-amp-surface",
+    luminance < 0.15 ? "#c2d0c6" : "transparent",
   );
   document.documentElement.style.setProperty(
     "--accent-ink",
-    luminance > 0.18 ? "#17281f" : "#ffffff",
+    luminance > 0.179 ? "#000000" : "#ffffff",
   );
 }
 function resetWorkspaceForms() {
@@ -834,16 +839,27 @@ function chooseOfficeView(view) {
   entry.userChoice = true;
   displayOfficeView(entry);
 }
+function currentAppearance() {
+  return document.documentElement.dataset.appearance === "dark" ? "dark" : "light";
+}
+function syncRoomAppearance() {
+  postToRoom({type: "office-studio:appearance", mode: currentAppearance()});
+}
+window.addEventListener("office-studio:appearance", syncRoomAppearance);
 function releaseRoomFrame() {
   if (!state.roomFrameId) return;
   const entry = state.rooms.get(state.roomFrameId);
   if (entry) entry.frame = null;
-  // Navigating away releases the previous office's renderer/WebGL context.
-  state.roomFrame.src = "about:blank";
-  state.roomFrame.hidden = true;
+  // A new browsing context also rejects late messages from the retired room.
+  state.roomFrame.remove();
+  state.roomFrame = null;
   state.roomFrameId = "";
+  state.roomExecutivePending = false;
+  updateReviewMark();
 }
 function ensureRoomFrame(entry, workspace, reload) {
+  if (state.roomFrame && (reload || state.roomFrameId !== workspace.id))
+    releaseRoomFrame();
   if (!state.roomFrame) {
     const frame = el("iframe", "embedded-room");
     frame.setAttribute(
@@ -853,24 +869,28 @@ function ensureRoomFrame(entry, workspace, reload) {
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("allow", "screen-wake-lock; fullscreen");
     frame.addEventListener("load", syncRoomReviewSignal);
+    frame.addEventListener("load", syncRoomAppearance);
     frame.setAttribute("aria-describedby", "room-disclosure");
     frame.addEventListener("error", () => {
       const current = state.rooms.get(state.roomFrameId);
-      if (!current || !isCurrent(state.roomFrameId, current.epoch)) return;
+      if (frame !== state.roomFrame || !current || !isCurrent(state.roomFrameId, current.epoch)) return;
       current.url = null;
       current.view = "desks";
+      releaseRoomFrame();
       displayOfficeView(current);
     });
     state.roomFrame = frame;
     $("room-frames").append(frame);
   }
-  if (state.roomFrameId && state.roomFrameId !== workspace.id)
-    releaseRoomFrame();
   state.roomFrameId = workspace.id;
   entry.frame = state.roomFrame;
   entry.frame.title = workspace.name + " · simulated 3D office";
-  if (reload || entry.frame.getAttribute("src") !== entry.url)
-    entry.frame.src = entry.url;
+  if (entry.frame.dataset.roomUrl !== entry.url) {
+    const initial = new URL(entry.url);
+    initial.searchParams.set("appearance", currentAppearance());
+    entry.frame.dataset.roomUrl = entry.url;
+    entry.frame.src = initial.href;
+  }
 }
 function syncOfficeRoom() {
   const workspace = state.workspace;
@@ -1003,7 +1023,7 @@ function renderWorkspace() {
   renderManual(workspace);
   syncOfficeRoom();
 }
-function syncRoomReviewSignal() {
+function postToRoom(message) {
   const frame = state.roomFrame,
     office = state.workspace;
   if (
@@ -1013,35 +1033,41 @@ function syncRoomReviewSignal() {
     !localRoomURL(frame.src)
   )
     return;
-  frame.contentWindow.postMessage(
-    {
-      type: "office-studio:review-signal",
-      pending: office.drafts.some((draft) => draft.status === "pending"),
-      executivePending: hasExecutiveReview(office),
-    },
-    new URL(frame.src).origin,
-  );
+  frame.contentWindow.postMessage(message, new URL(frame.src).origin);
+}
+function syncRoomReviewSignal() {
+  const office = state.workspace;
+  if (office) postToRoom({
+    type: "office-studio:review-signal",
+    pending: office.drafts.some((draft) => draft.status === "pending"),
+    executivePending: !!pendingExecutiveDraft(office),
+  });
 }
 
-function hasExecutiveReview(office) {
+function pendingExecutiveDraft(office) {
   const executive = executiveAgent(office);
-  return !!executive && office.drafts.some(
+  return executive && office.drafts.find(
     (draft) => draft.status === "pending" && draft.agent === executive.name,
   );
 }
 
-function updateReviewMark(pending) {
+function updateReviewMark(pending = state.workspace?.drafts.filter(draft => draft.status === "pending").length || 0) {
   const mark = $("review-mark");
+  const saved = pendingExecutiveDraft(state.workspace);
+  const native = !!state.workspace && state.roomExecutivePending;
   mark.disabled = !state.workspace;
   mark.dataset.pending = String(pending);
-  mark.dataset.active = String(pending > 0);
-  mark.dataset.executiveAlert = String(hasExecutiveReview(state.workspace));
-  const label = !state.workspace
-    ? "Beyder & Co. ampersand"
-    : `Beyder & Co. · Open approval inbox · ${pending} pending draft${pending === 1 ? "" : "s"}`;
+  mark.dataset.active = String(pending > 0 || native);
+  mark.dataset.executiveAlert = String(!!saved || native);
+  let label = "Beyder & Co. ampersand";
+  if (state.workspace) {
+    const executive = displayAgentTitle(executiveAgent());
+    if (saved) label += ` · Review ${executive}’s draft in the approval inbox`;
+    else if (native) label += ` · Open ${executive}’s approval in the 3D office`;
+    else label += ` · Open approval inbox · ${pending} pending draft${pending === 1 ? "" : "s"}`;
+  }
   mark.setAttribute("aria-label", label);
   mark.title = label;
-  syncRoomReviewSignal();
 }
 
 function renderDrafts() {
@@ -1053,6 +1079,7 @@ function renderDrafts() {
       "";
   const pending = drafts.filter((d) => d.status === "pending").length;
   updateReviewMark(pending);
+  syncRoomReviewSignal();
   $("pending-count").textContent = String(pending);
   $("table-count").textContent = pending
     ? `${pending} draft${pending === 1 ? "" : "s"} waiting for you`
@@ -1146,6 +1173,12 @@ window.addEventListener("message", (event) => {
     event.origin !== new URL(frame.src).origin
   )
     return;
+  if (event.data?.type === "office-studio:room-executive-alert") {
+    if (Array.isArray(event.data) || Object.keys(event.data).length !== 2 || typeof event.data.pending !== "boolean") return;
+    state.roomExecutivePending = event.data.pending;
+    updateReviewMark();
+    return;
+  }
   if (event.data?.type === "office-studio:add-agent") {
     if (state.busy || state.workspace.crew.length >= 10) return;
     state.addingFromRoom = true;
@@ -1395,6 +1428,18 @@ $("draft-form").addEventListener("submit", (event) => {
   );
 });
 $("review-mark").addEventListener("click", () => {
+  const office = state.workspace;
+  if (!office) return;
+  const saved = pendingExecutiveDraft(office);
+  if (saved) {
+    state.draftId = saved.id;
+    renderDrafts();
+  } else if (state.roomExecutivePending) {
+    chooseOfficeView("room");
+    state.roomFrame.focus();
+    postToRoom({type: "office-studio:open-executive-alert"});
+    return;
+  }
   chooseOfficeView("desks");
   $("boardroom").click();
 });

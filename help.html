@@ -3,8 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f3ed" />
     <title>Office Studio · Help</title>
     <link rel="icon" href="/assets/ampersand.svg" />
+    <script src="/appearance.js"></script>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -13,7 +15,13 @@
         ><span class="brand-symbol" aria-hidden="true"></span> Office
         <strong>Studio</strong></a
       >
-      <a class="button quiet" href="/">Open Office Studio</a>
+      <div class="guide-tools">
+        <a class="button quiet" href="/">Open Office Studio</a>
+        <button id="appearance-toggle" class="appearance-toggle" type="button"
+          role="switch" aria-label="Dark mode" aria-checked="false" data-appearance-toggle>
+          <span aria-hidden="true">☀</span><span aria-hidden="true">☾</span>
+        </button>
+      </div>
     </header>
     <main>
       <section class="setup" aria-labelledby="guide-title">
@@ -38,6 +46,12 @@
             Extract your build and open <strong>Start Office Studio</strong> for
             your system. Choose a name, logo, accent and practice. Select
             <strong>Create office</strong> to meet the crew.
+          </p>
+          <p>
+            Use the sun and moon switch beside <strong>New office</strong> to
+            choose light or dark mode. Studio starts with your system setting
+            and remembers your selection in this browser at this local address.
+            The room controls and this guide follow the same choice.
           </p>
           <p>
             Before you create an office, the setup preview includes its
@@ -68,11 +82,11 @@
           </details>
           <h2 id="drafting">Drafts and providers</h2>
           <p>
-            The ampersand sculpture uses your office color. It lights up red
-            when the Head Executive needs your attention. The color returns
-            when that alert clears. Select the ampersand in the Studio header
-            to open your saved approval inbox. With reduced motion enabled,
-            the alert stays visible without pulsing.
+            The ampersand beside <strong>Office Studio</strong> and the sculpture
+            in the room both turn red when the Head Executive needs a decision.
+            Select the header ampersand to review the request. Both marks return
+            to the office color when the last executive alert clears.
+            With reduced motion enabled, the alert stays steady.
           </p>
           <p>
             Pick a desk, write a sample brief, and select
