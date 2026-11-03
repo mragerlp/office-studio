@@ -32,7 +32,7 @@ The launcher prints its actual loopback address. For isolated development, pass 
 | Interface and synthetic starter crews | `index.html`, `app.js`, `style.css`, `packs/` |
 | Local HTTP, validation, and SQLite storage | `server.py`, `loopback_server.py` |
 | Provider adapters and terminal configuration | `providers.py`, `configure_providers.py` |
-| Optional private room bridge and presentation | `room_preview.py`, `room_theme.js` |
+| Built-in 3D office, isolated room server and branding | `room/office.html`, `room_preview.py`, `room_theme.js`, `assets/three-r128.min.js` |
 | Launching and packaging | `launch.py`, platform launchers, `package.py`, `build_runner.py` |
 | Repeatable checks | `test_*.py`, `.github/workflows/` |
 
@@ -49,9 +49,9 @@ The launcher prints its actual loopback address. For isolated development, pass 
 
 ## Protect private material
 
-Use fictional business information in fixtures, screenshots, documentation, and public packages. Do not commit credentials, environment files, local databases, customer records, uploaded tenant logos, private manuals, or owner-supplied room artwork. Do not inspect unrelated credentials or agent session histories.
+Use fictional business information in fixtures, screenshots, documentation, and public packages. Do not commit credentials, environment files, local databases, customer records, uploaded tenant logos, private manuals, or private room overrides.
 
-The optional room source belongs to its owner and stays separate from public source. Read it only within the owner's stated task. Public packaging uses the explicit allowlist. Use `--private-room` for an explicitly requested private handoff, and keep that ZIP out of Git and public workflow artifacts. The owner cleared the README interior screenshot for public display. Obtain separate clearance before publishing additional private room images.
+Bloodwave confirmed Igor Beyder's clearance to publish and redistribute the original room HTML with Office Studio. The public distribution includes the approved room in `room/office.html` and the local Three.js runtime with its license. Package only the explicit allowlist. Additional owner-supplied rooms and private handoff ZIPs stay outside Git and public workflow artifacts. The existing permission for the README interior screenshot is recorded separately.
 
 ## Repository guidance versus application prompts
 

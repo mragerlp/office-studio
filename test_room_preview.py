@@ -72,7 +72,8 @@ class RoomPreviewTests(unittest.TestCase):
         policy = headers["Content-Security-Policy"]
         self.assertIn(f"frame-ancestors http://127.0.0.1:{self.httpd.server_port}", policy)
         self.assertIn(f"connect-src http://127.0.0.1:{frame.port}/packs/{item['id']}.json", policy)
-        self.assertIn("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", policy)
+        self.assertIn(f"script-src 'unsafe-inline' http://127.0.0.1:{frame.port}/assets/three-r128.min.js", policy)
+        self.assertNotIn("cdnjs", policy)
         self.assertEqual(headers["Permissions-Policy"], "screen-wake-lock=(self)")
         self.assertNotIn("Access-Control-Allow-Origin", headers)
         status, pack, _ = self.request(f"/packs/{item['id']}.json", port=frame.port)
@@ -102,12 +103,107 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertTrue(exported["gates"][0]["brief"]["action"])
         self.assertTrue(exported["gates"][0]["brief"]["ifDecline"])
 
-    def test_incompatible_roster_is_not_renamed(self):
+    def test_custom_roster_uses_renderer_keys_without_changing_saved_names(self):
         for name in ("OWNER", "Crimson", "CRIMSON-LONG-NAME"):
             item = self.create(crew=[{"name": name, "specialty": "Coordination", "instruction": "Prepare fictional plans."}])
-            self.assertIsNone(self.room(item))
+            frame = self.room(item)
+            self.assertIsNotNone(frame)
+            exported = self.request(f"/packs/{item['id']}.json", port=frame.port)[1]
+            self.assertEqual(exported["crew"][0]["name"], "CRIMSON")
+            rendered = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
+            self.assertEqual(rendered["agents"][0]["title"], "Head Executive")
+            self.assertTrue(rendered["agents"][0]["executive"])
             saved = self.request(f"/api/workspaces/{item['id']}")[1]
             self.assertEqual(saved["crew"][0]["name"], name)
+
+    def test_renderer_alias_collisions_unicode_titles_and_gate_ownership(self):
+        names = ["Owner", "CRIMSON", "A B", "A-B", "DESK04", "International specialist name", "\u7814\u7a76", "legal"]
+        item = self.create(crew=[{"name": n, "specialty": "Synthetic lane", "instruction": "Prepare a fictional brief."} for n in names],
+                           gates=[{"owner": n, "need": "Review fictional work", "brief": {}} for n in names])
+        frame = self.room(item)
+        pack = self.request(f"/packs/{item['id']}.json", port=frame.port)[1]
+        keys = [a["name"] for a in pack["crew"]]
+        self.assertEqual(len(keys), len(names))
+        self.assertTrue(all(re.fullmatch(r"[A-Z][A-Z0-9 -]{0,13}", n) for n in keys))
+        self.assertEqual(len(set(re.sub(r"[^a-z0-9]+", "-", n.lower()).strip("-") for n in keys)), len(keys))
+        self.assertEqual([g["owner"] for g in pack["gates"]], keys)
+        data = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
+        self.assertEqual([a["agent"] for a in data["agents"]], keys)
+        self.assertEqual([a["title"] for a in data["agents"]], ["Owner", "Head Executive", *names[2:-1], "Legal Review"])
+        self.assertEqual([a["name"] for a in self.request(f"/api/workspaces/{item['id']}")[1]["crew"]], names)
+
+    def test_default_bundled_room_and_local_pinned_dependency(self):
+        from hashlib import sha256
+        app = server.create_server(0, Path(self.sandbox.name) / "bundled")
+        worker = threading.Thread(target=app.serve_forever, daemon=True)
+        worker.start()
+        try:
+            status, item, _ = self.request("/api/workspaces", port=app.server_port, method="POST",
+                                            body={"name": "Bundled Synthetic Office", "crew": [], "gates": []})
+            self.assertEqual(status, 201)
+            response = self.request(f"/api/workspaces/{item['id']}/room", port=app.server_port)[1]
+            frame = urlsplit(response["url"])
+            status, page, headers = self.request(frame.path + "?" + frame.query, port=frame.port)
+            self.assertEqual(status, 200)
+            self.assertIn(b'async function loadPracticePack(key)', page)
+            self.assertIn(b'src="/assets/three-r128.min.js"', page)
+            self.assertNotIn(b'src="https://cdnjs', page)
+            self.assertNotIn("https:", headers["Content-Security-Policy"])
+            status, js, _ = self.request("/assets/three-r128.min.js", port=frame.port)
+            self.assertEqual(status, 200)
+            self.assertEqual(sha256(js).hexdigest(), "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2")
+            for path in ("/assets/three-LICENSE.txt", "/assets/three-r128.min.js?x=1", "/room/office.html"):
+                self.assertEqual(self.request(path, port=frame.port)[0], 404)
+            self.assertNotIn(b"followupboss.com", page)
+            self.assertNotIn(b"Jared", page)
+            self.assertNotIn(b"studio.local", page)
+            self.assertNotIn(b"local-office-bridge-example", page)
+            self.assertNotIn(b"MCP plugin installed", page)
+            self.assertNotIn(b"const snippet =", page)
+            self.assertIn(b"Use Add agent in Office Studio", page)
+            self.assertNotIn(b"Waiting for the Studio", page)
+            self.assertNotIn(b"Worked out from Phone system activity in Epic", page)
+            self.assertIn(b"No external feed connected", page)
+            # Brand text is allowed in static HTML and escaped JSON only. It
+            # must never enter the native mirror's JavaScript template literal.
+            unsafe_name = "`${window.brandInjection=1}<img src=x>"
+            with app.store.connection(write=True) as db:
+                saved = app.store.get(db, item["id"])
+                saved["name"] = unsafe_name
+                app.store.save(db, saved)
+            _, unsafe_page, _ = self.request(frame.path + "?" + frame.query, port=frame.port)
+            native_script = unsafe_page.split(b"<script", 1)[1].split(b'<script type="application/json" id="office-studio-presentation">', 1)[0]
+            self.assertNotIn(b"window.brandInjection", native_script)
+            self.assertIn(b'<span class="wordmark">BEYDER<i>&amp;</i>CO.</span>', native_script)
+            from build_runner import smoke_room
+            smoke_room(app.server_port)
+        finally:
+            app.shutdown()
+            app.server_close()
+            worker.join(timeout=5)
+
+    def test_one_executive_uses_saved_identity_with_custom_title_preserved(self):
+        for crew, expected in (([{"name": "OWNER", "specialty": "Chief of Staff"}, {"name": "HOST", "specialty": "Service"}], 0),
+                               ([{"name": "HOST", "specialty": "Service"}, {"name": "LEAD", "specialty": "Chief of Staff"}], 1),
+                               ([{"name": "LEAD", "specialty": "Chief of Staff"}, {"name": "CRIMSON", "specialty": "Coordination"}], 1)):
+            item = self.create(crew=[{**a, "instruction": "Prepare fictional work."} for a in crew], color="#123456")
+            self.request(f"/api/workspaces/{item['id']}/agents/appearance", method="POST",
+                         body={"agent": crew[expected]["name"], "title": "Company Director"})
+            frame = self.room(item)
+            people = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])["agents"]
+            self.assertEqual([i for i, a in enumerate(people) if a["executive"]], [expected])
+            self.assertEqual(people[expected]["title"], "Company Director")
+            self.assertEqual(people[expected]["color"], "#123456")
+
+    def test_public_package_contains_builtin_room_and_local_dependency(self):
+        from zipfile import ZipFile
+        import package
+        output = package.build_package(Path(self.sandbox.name) / "public.zip")
+        with ZipFile(output) as bundle:
+            self.assertEqual(bundle.read("office-studio/room/office.html"), (server.ROOT / "room" / "office.html").read_bytes())
+            self.assertEqual(bundle.read("office-studio/assets/three-r128.min.js"), (server.ROOT / "assets" / "three-r128.min.js").read_bytes())
+            self.assertIn("office-studio/assets/three-LICENSE.txt", bundle.namelist())
+            self.assertNotIn("office-studio/private-room.html", bundle.namelist())
 
     def test_routes_queries_hosts_and_workspace_boundaries_fail_closed(self):
         item = self.create()
@@ -160,9 +256,9 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertEqual(changed["drafts"], item["drafts"])
         frame = self.room(item)
         data = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
-        self.assertEqual(data["agents"], [{"agent": "CRIMSON", "title": "Head Executive", "color": "#123456"},
-                                          {"agent": "HOST", "title": "Guest Relations", "color": "#abcdef"},
-                                          {"agent": "LEGAL", "title": "Legal Review", "color": ""}])
+        self.assertEqual(data["agents"], [{"agent": "CRIMSON", "title": "Head Executive", "color": "#123456", "executive": True},
+                                          {"agent": "HOST", "title": "Guest Relations", "color": "#abcdef", "executive": False},
+                                          {"agent": "LEGAL", "title": "Legal Review", "color": "", "executive": False}])
         self.assertEqual(self.request(f"/packs/{item['id']}.json", port=frame.port)[1]["crew"][1]["name"], "HOST")
         status, customized, _ = self.request(base + "/agents/appearance", method="POST", body={"agent": "LEGAL", "title": "Counsel Liaison"})
         self.assertEqual(status, 200)
@@ -205,21 +301,15 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertNotIn(b"private drafting fixture", raw)
         self.assertEqual(self.source.read_bytes(), self.html)
 
-    def test_disabled_room_returns_null_and_does_not_allow_frames(self):
-        disabled = server.create_server(0, Path(self.sandbox.name) / "disabled")
-        thread = threading.Thread(target=disabled.serve_forever, daemon=True)
-        thread.start()
-        try:
-            status, item, _ = self.request("/api/workspaces", port=disabled.server_port, method="POST",
-                                           body={"name": "Local", "crew": [], "gates": []})
-            self.assertEqual(status, 201)
-            status, data, headers = self.request(f"/api/workspaces/{item['id']}/room", port=disabled.server_port)
-            self.assertEqual((status, data), (200, {"url": None}))
-            self.assertNotIn("frame-src http", headers["Content-Security-Policy"])
-        finally:
-            disabled.shutdown()
-            disabled.server_close()
-            thread.join(timeout=5)
+    def test_empty_legacy_roster_keeps_2d_fallback_without_inventing_desks(self):
+        item = self.create()
+        with self.httpd.store.connection(write=True) as db:
+            saved = self.httpd.store.get(db, item["id"])
+            saved["crew"] = []
+            self.httpd.store.save(db, saved)
+        status, data, _ = self.request(f"/api/workspaces/{item['id']}/room")
+        self.assertEqual((status, data), (200, {"url": None}))
+        self.assertEqual(self.request(f"/api/workspaces/{item['id']}")[1]["crew"], [])
 
 
 if __name__ == "__main__":

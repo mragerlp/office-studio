@@ -1,6 +1,7 @@
 """Build and smoke-test native runners in CI; never bundle private room HTML."""
 import argparse
 import http.client
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 import package
@@ -47,7 +49,7 @@ def check_binary(path, target):
 def build(target, output):
     check_platform(target)
     # Keep the data allowlist separate from the broader source handoff list.
-    assets = ["index.html", "help.html", "app.js", "style.css", "room_theme.js", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
+    assets = ["index.html", "help.html", "app.js", "style.css", "room_theme.js", "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="office-freeze-") as scratch:
@@ -66,14 +68,50 @@ def build(target, output):
     return runner
 
 
-def get(port, path):
+def request(port, path, body=None):
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
     try:
-        connection.request("GET", path)
+        encoded = None if body is None else json.dumps(body)
+        connection.request("GET" if body is None else "POST", path, encoded,
+                           {} if body is None else {"Content-Type": "application/json"})
         response = connection.getresponse()
         return response.status, response.read()
     finally:
         connection.close()
+
+
+def get(port, path):
+    return request(port, path)
+
+
+def smoke_room(port):
+    """Exercise actual bundled room assets in the extracted frozen process."""
+    status, raw = request(port, "/api/workspaces", {
+        "name": "Fictional Native Smoke Office", "color": "#123456",
+        "crew": [{"name": "Executive fixture", "specialty": "Chief of Staff", "instruction": "Prepare synthetic plans."},
+                 {"name": "Specialist fixture with a long name", "specialty": "Research", "instruction": "Prepare synthetic research."}],
+        "gates": [{"owner": "Specialist fixture with a long name", "need": "Review fictional work", "brief": {}}]})
+    if status != 201:
+        raise RuntimeError("Frozen runner could not save a synthetic office.")
+    workspace = json.loads(raw)
+    status, raw = get(port, f"/api/workspaces/{workspace['id']}/room")
+    frame = urlsplit(json.loads(raw)["url"])
+    if status != 200 or frame.scheme != "http" or frame.hostname != "127.0.0.1" or not frame.port or frame.port == port:
+        raise RuntimeError("Frozen runner did not expose its isolated bundled room.")
+    status, page = get(frame.port, frame.path + "?" + frame.query)
+    if status != 200 or b'async function loadPracticePack(key)' not in page or b'src="/assets/three-r128.min.js"' not in page or b'src="https://cdnjs' in page:
+        raise RuntimeError("Frozen room is missing its original scene or local dependency rewrite.")
+    match = re.search(rb'<script type="application/json" id="office-studio-presentation">(.*?)</script>', page, re.S)
+    presentation = json.loads(match[1]) if match else {}
+    if presentation.get("name") != workspace["name"] or presentation.get("agents", [{}])[0].get("title") != "Head Executive":
+        raise RuntimeError("Frozen room presentation does not match the saved office.")
+    status, raw = get(frame.port, f"/packs/{workspace['id']}.json")
+    pack = json.loads(raw)
+    if status != 200 or len(pack["crew"]) != len(workspace["crew"]) or pack["gates"][0]["owner"] != pack["crew"][1]["name"]:
+        raise RuntimeError("Frozen room did not preserve crew and gate ownership.")
+    status, javascript = get(frame.port, "/assets/three-r128.min.js")
+    if status != 200 or hashlib.sha256(javascript).hexdigest() != "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2":
+        raise RuntimeError("Frozen room did not serve its pinned local Three.js.")
 
 
 def stop(process):
@@ -151,7 +189,8 @@ def smoke(target, archive):
                 raise RuntimeError("Smoke test unexpectedly inherited provider configuration.")
             if get(port, "/api/workspaces") != (200, b'{"workspaces": []}'):
                 raise RuntimeError("Smoke test did not start with isolated storage.")
-            print(f"PASS: extracted frozen {target} runner, bundled UI, private-free ZIP and unconfigured provider list.")
+            smoke_room(port)
+            print(f"PASS: extracted frozen {target} runner, bundled UI and isolated local room, private-free ZIP and unconfigured provider list.")
         finally:
             stop(process)
             reader.join(timeout=5)
