@@ -122,6 +122,8 @@ Packaging writes the source edition to `dist/office-studio.zip` from an explicit
 
 ## Development
 
+For the next product phase, see the [scaling and department-floor research](https://github.com/mragerlp/office-studio/blob/develop/docs/research/2026-11-03-scaling/README.md), checked November 3, 2026. It covers team sign-in, provider and mailbox connections, persistent work, and lower floors within the existing skyscraper, with primary sources and proposed release checks.
+
 For your first contribution, start with the [shared agent guide](AGENTS.md). There are short entry guides for [Muse Code](MUSE.md), [Gemini CLI](GEMINI.md), [Claude Code](CLAUDE.md), and [Codex or ChatGPT](CODEX.md).
 
 Daily work targets `develop`, the default branch. Open feature pull requests into `develop`. Promote a tested revision to `main` through a separate release pull request after owner review. The **Check Office Studio** workflow tests and builds a public platform ZIP on Windows and macOS. [View workflow runs](https://github.com/mragerlp/office-studio/actions/workflows/check.yml).
