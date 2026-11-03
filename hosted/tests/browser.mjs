@@ -495,12 +495,9 @@ try {
     "false",
     "specialist draft does not signal an executive alert",
   );
-  assert(
-    (await room
-      .locator("#rosterList")
-      .getByText("Intake", { exact: true })
-      .count()) > 0,
-  );
+  // The saved inbox can load before WebGL finishes seating the crew after reload.
+  const intakeRow = room.locator("#rosterList li").filter({ hasText: "Intake" });
+  await intakeRow.getByText("Draft awaiting review", { exact: true }).waitFor({ timeout: 45000 });
   await el("runs")
     .getByRole("button", { name: "Approve", exact: true })
     .click();

@@ -52,6 +52,14 @@ jobs:
             cd "$RUNNER_TEMP/pilot-stack"
             supabase stop --no-backup >/dev/null 2>&1 || true
           fi
+  hosted-browser:
+    name: Hosted Chromium office walkthrough
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Exercise the built interface and the room in Chromium
         run: |
           npm install --prefix "$RUNNER_TEMP/pilot-browser" --no-audit --no-fund playwright@1.62.1
