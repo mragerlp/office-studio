@@ -21,9 +21,24 @@
     "plum",
     "olive",
   ];
+  function crewSpec(desk, index) {
+    return {
+      name: index ? "DESK" + index : "CRIMSON",
+      specialty: String(desk.specialty || "Office work"),
+      instruction: "Review assigned work in the office inbox.",
+      engine: "Office Studio",
+      systems: [],
+      style: "headset",
+      color: palette[index],
+    };
+  }
   function refresh() {
     if (!mounted) return;
     const api = window.AgentOffice;
+    for (let i = api.state.order.length; i < current.desks.length; i++) {
+      const added = api.addAgent(crewSpec(current.desks[i], i), {seated:true});
+      if (typeof added !== "object" || !added) break;
+    }
     for (const [i, id] of api.state.order.entries()) {
       const waiting = !!current.waiting[i];
       const status = waiting ? "WAITING" : "IDLE";
@@ -49,15 +64,7 @@
     ) return;
     current = view;
     if (begin) {
-      const crew = view.desks.map((d, i) => ({
-        name: i ? "DESK" + i : "CRIMSON",
-        specialty: String(d.specialty || "Office work"),
-        instruction: "Review assigned work in the office inbox.",
-        engine: "Office Studio",
-        systems: [],
-        style: "headset",
-        color: palette[i],
-      }));
+      const crew = view.desks.map(crewSpec);
       const presentation = document.createElement("script");
       presentation.type = "application/json";
       presentation.id = "office-studio-presentation";
@@ -93,13 +100,23 @@
         "Office inbox status. Open a draft in the workspace to review it.";
       OFFICE_STATE.meta.feed = "hosted";
       UI.renderFeed();
+      // Native arrivals normally switch the camera to the lift and schedule
+      // simulated work. Here a persisted desk joins the current office view.
+      VIEW.arrive = (agent) => {
+        const index = OFFICE_STATE.order.indexOf(agent.id);
+        const desk = current.desks[index];
+        agent.name = desk.name;
+        agent.monogram = desk.name.split(/\s+/).map((part) => part[0] || "").join("").slice(0, 2).toUpperCase();
+        seatAgent(agent);
+        VIEW.sync(agent.id);
+      };
       UI.toggleBoard = (open) => {
         if (open !== false) parent.postMessage({ type: "studio:open-board" }, origin);
       };
       UI.openAdd = () => parent.postMessage({ type: "office-studio:add-agent" }, origin);
       mounted = true;
       refresh();
-      parent.postMessage({ type: "studio:room-ready" }, origin);
+      parent.postMessage({ type: "studio:room-mounted" }, origin);
     },
   };
   parent.postMessage({ type: "studio:room-ready" }, origin);

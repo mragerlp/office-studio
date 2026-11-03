@@ -24,6 +24,7 @@ const codes = new Map();
 const assignments = [];
 const roomMessages = [];
 const errors = [];
+const coldRoomTimeout = 60_000;
 const apiKey = "sb_publishable_synthetic_fixture";
 let siteOrigin,
   serviceOrigin,
@@ -334,14 +335,25 @@ try {
     await formButton("create", "Create office").click();
     await waitText("title", name);
     const frame = page.frameLocator("#office-room");
-    await frame.locator("#rosterList li").first().waitFor({ timeout: 30000 });
-    await frame.locator("canvas").first().waitFor();
+    await el("office-room").scrollIntoViewIfNeeded({
+      timeout: coldRoomTimeout,
+    });
+    await frame
+      .locator("#rosterList li")
+      .first()
+      .waitFor({ timeout: coldRoomTimeout });
+    await el("room-loading").waitFor({
+      state: "hidden",
+      timeout: coldRoomTimeout,
+    });
+    await frame.locator("canvas").first().waitFor({ timeout: coldRoomTimeout });
     return frame;
   };
   const clear = async () => {
     await el("logout").click();
     await el("login").waitFor();
     assert.equal(await el("office-room").getAttribute("src"), null);
+    assert(await el("room-loading").isHidden());
     assert.equal(
       await page.evaluate(() =>
         Object.keys(sessionStorage).some(
@@ -362,10 +374,66 @@ try {
   await chooseLogin("Google");
   const room = await create("Juniper Workshop");
   const waitForFourthDesk = async () => {
-    await room
-      .locator("#rosterList")
-      .getByText("Scheduling", { exact: true })
-      .waitFor();
+    try {
+      await el("office-room").scrollIntoViewIfNeeded({
+        timeout: coldRoomTimeout,
+      });
+      await el("room-loading").waitFor({
+        state: "hidden",
+        timeout: coldRoomTimeout,
+      });
+      await room
+        .locator("#rosterList")
+        .getByText("Scheduling", { exact: true })
+        .waitFor({ timeout: coldRoomTimeout });
+      const currentFrame = page
+        .frames()
+        .find((f) => f.url().includes("suite-room.html"));
+      assert(
+        await currentFrame.evaluate(() => {
+          const { OFFICE_STATE, WORLD, scene } = window.__office;
+          const id = OFFICE_STATE.order.find(
+            (id) => OFFICE_STATE.agents[id].name === "Scheduling",
+          );
+          const physical = WORLD.byId[id];
+          return Boolean(
+            physical?.fig?.root &&
+            physical.st?.group?.parent === scene &&
+            physical.st.spec.name === "Scheduling",
+          );
+        }),
+        "the saved desk must also have a named physical workstation and crew figure",
+      );
+    } catch (error) {
+      const currentFrame = page
+        .frames()
+        .find((f) => f.url().includes("suite-room.html"));
+      const diag =
+        currentFrame &&
+        (await currentFrame
+          .evaluate(() => ({
+            feed: window.AgentOffice?.state.meta.feed,
+            agents: window.AgentOffice?.state.order.map(
+              (id) => window.AgentOffice.state.agents[id].name,
+            ),
+            theme: document.documentElement.dataset.officeTheme,
+            width: innerWidth,
+            rows: document.querySelectorAll("#rosterList li").length,
+            rendererReady: Boolean(window.__office?.renderer),
+            rosterVisible: Boolean(
+              document.querySelector("#rosterList")?.getBoundingClientRect()
+                .width,
+            ),
+          }))
+          .catch(() => ({ detached: true })));
+      throw new Error(
+        "Fourth hosted desk unavailable. Room: " +
+          JSON.stringify(diag) +
+          "; mounted: " +
+          (await el("room-loading").isHidden()),
+        { cause: error },
+      );
+    }
     assert.equal(await room.locator("#rosterList li").count(), 4);
   };
   await room
@@ -406,8 +474,34 @@ try {
   assert(await el("hosted-add-desk").evaluate((details) => details.open));
   await el("desk-name").fill("Scheduling");
   await el("desk-specialty").fill("Appointments");
+  const mark = await initialRoom.evaluateHandle(() => ({
+    renderer: window.__office.renderer,
+    canvas: window.__office.renderer.domElement,
+    view: window.__office.UI.currentView,
+  }));
   await formButton("add-desk", "Add desk to office").click();
+  await waitText("notice", "added");
+  assert.equal(
+    await el("draft")
+      .locator("select[name=desk] option", { hasText: "Scheduling" })
+      .count(),
+    1,
+  );
+  assert(
+    !initialRoom.isDetached(),
+    "adding a desk should preserve the mounted room frame",
+  );
   await waitForFourthDesk();
+  assert(
+    await mark.evaluate(
+      ({ renderer, canvas, view }) =>
+        renderer === window.__office.renderer &&
+        canvas === window.__office.renderer.domElement &&
+        view === window.__office.UI.currentView,
+    ),
+    "the native scene and active camera should survive an appended desk",
+  );
+  await mark.dispose();
   await page.reload();
   await waitText("title", "Juniper Workshop");
   await waitForFourthDesk();
@@ -496,8 +590,12 @@ try {
     "specialist draft does not signal an executive alert",
   );
   // The saved inbox can load before WebGL finishes seating the crew after reload.
-  const intakeRow = room.locator("#rosterList li").filter({ hasText: "Intake" });
-  await intakeRow.getByText("Draft awaiting review", { exact: true }).waitFor({ timeout: 45000 });
+  const intakeRow = room
+    .locator("#rosterList li")
+    .filter({ hasText: "Intake" });
+  await intakeRow
+    .getByText("Draft awaiting review", { exact: true })
+    .waitFor({ timeout: 45000 });
   await el("runs")
     .getByRole("button", { name: "Approve", exact: true })
     .click();
