@@ -1,6 +1,6 @@
 // Send only presentation fields to the opaque-origin room. Drafts and documents stay in Studio.
 (() => {
-  let office = null, signature = "", ready = false;
+  let office = null, layout = null, ready = false;
   const frame = () => document.getElementById("office-room");
   function send() {
     if (!ready || !office) return;
@@ -21,7 +21,8 @@
     const old = frame();
     office = null;
     ready = false;
-    signature = "";
+    layout = null;
+    document.getElementById("room-loading").hidden = true;
     const mark = document.getElementById("office-mark");
     mark.removeAttribute("href");
     mark.setAttribute("aria-disabled", "true");
@@ -54,10 +55,16 @@
       color: /^#[0-9a-f]{6}$/i.test(value.color) ? value.color : "#285b53",
       desks,
     };
-    const next = JSON.stringify(info);
-    if (signature !== next) {
+    // Appended desks can be seated in the live scene. Changed identities, order,
+    // or appearance require a fresh isolated context.
+    const compatible = layout && layout.id === info.id && layout.name === info.name &&
+      layout.color === info.color && layout.desks.every((old, i) => {
+        const desk = desks[i];
+        return desk && desk.id === old.id && desk.name === old.name && desk.specialty === old.specialty;
+      });
+    if (!compatible) {
       clear();
-      signature = next;
+      document.getElementById("room-loading").hidden = false;
       const room = frame();
       room.hidden = false;
       const mode = document.documentElement.dataset.appearance === "dark"
@@ -66,6 +73,7 @@
       room.src = "./suite-room.html?pack=hosted&view=overview&appearance=" +
         mode;
     }
+    layout = info;
     const pending = new Set((value.pendingDeskIds || []).map(String));
     office = {
       name: info.name,
@@ -90,6 +98,9 @@
     if (e.origin !== "null" || e.source !== frame()?.contentWindow || !office) return;
     if (e.data?.type === "studio:room-ready") {
       ready = true;
+      send();
+    } else if (e.data?.type === "studio:room-mounted") {
+      document.getElementById("room-loading").hidden = true;
       send();
     } else if (e.data?.type === "studio:open-board") {
       document.getElementById("review").focus();
