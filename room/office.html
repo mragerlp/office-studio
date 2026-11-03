@@ -17427,6 +17427,7 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;
 /** Words for a state, shared by bubbles, roster and panel. */
 function stateWords(a) {
   if (a.status === 'WAITING') return { cls: 'wait', text: 'Needs you' };
+  if (OFFICE_STATE.meta.feed === 'hosted' && a.status === 'IDLE') return { cls: 'idle', text: 'Idle' };
   if (a.location === 'arriving') return { cls: 'idle', text: 'Arriving' };
   if (a.paused) return { cls: 'paused', text: 'Paused', long: 'Paused by design' };
   if (a.location === 'walking') {
@@ -17502,6 +17503,8 @@ const currentTask = id => OFFICE_STATE.tasks.filter(t => t.agentId === id && t.c
 
 /** Second line of a crew row: what the agent is doing, in plain words. */
 function rosterLine(a) {
+  // A walk through the room does not change a hosted desk's saved work state.
+  if (OFFICE_STATE.meta.feed === 'hosted') return { text: a.detail, quiet: a.status === 'IDLE' };
   if (a.status === 'WAITING') {
     const g = OFFICE_STATE.approvals.find(x => x.agentId === a.id);
     if (g) return { text: g.need };

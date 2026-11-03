@@ -372,6 +372,29 @@ try {
     .getByText("Ready for a file brief", { exact: true })
     .first()
     .waitFor();
+  // An idle desk's walking animation must not displace its saved work status.
+  const initialRoom = page
+    .frames()
+    .find((f) => f.url().includes("suite-room.html"));
+  await initialRoom.waitForFunction(
+    () => {
+      const state = window.AgentOffice.state;
+      return state.order.some((id) => {
+        const agent = state.agents[id];
+        const row = document.getElementById("r-" + id);
+        const detail = row?.querySelector(".tk");
+        return (
+          agent.location === "walking" &&
+          agent.status === "IDLE" &&
+          detail?.textContent === "Ready for a file brief" &&
+          row.querySelector(".chip").textContent.trim() === "Idle" &&
+          detail.getBoundingClientRect().width > 0
+        );
+      });
+    },
+    null,
+    { timeout: 30000 },
+  );
   await room.locator("#btnBoard").click();
   await page.waitForFunction(() => document.activeElement?.id === "review");
   await room.locator("#btnAdd").click();
