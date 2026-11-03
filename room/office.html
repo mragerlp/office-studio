@@ -394,13 +394,16 @@ body.board-open #toasts { bottom: calc(var(--board-h) + calc(30 * var(--u))); }
 }
 @media (max-width: 620px) {
   :root { --bar-h: calc(98 * var(--u)); --board-h: 54vh; }
-  #topbar { flex-wrap: wrap; align-content: center; row-gap: calc(10 * var(--u)); column-gap: calc(10 * var(--u)); }
+  #topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: calc(8 * var(--u)); }
+  #topbar .brand { min-width: 0; align-items: center; gap: 4px; }
+  #topbar .wordmark { min-width: 0; }
   .wordmark { font-size: calc(19 * var(--u)); }
   #counts { margin: 0 0 0 auto; }
   .count[data-k="WORKING"] { display: none; }
   .count .n { font-size: calc(20 * var(--u)); }
   .count.total { padding-left: calc(10 * var(--u)); margin-left: calc(2 * var(--u)); }
-  .actions { width: 100%; gap: calc(8 * var(--u)); }
+  .actions { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: calc(5 * var(--u)); }
+  #viewSelect { width: 100%; min-width: 0; }
   .actions .sp { margin-left: auto; }
   .btn { padding: 0 calc(12 * var(--u)); }
   .btn .lbl-long { display: none; }
