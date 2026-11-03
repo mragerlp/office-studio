@@ -41,7 +41,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check PyInstaller==6.22.3
       - name: Freeze the native launcher on its own architecture
         run: python -B build_runner.py build --target ${{ matrix.target }} --output dist/native
-      - name: Build the public portable ZIP without private room HTML
+      - name: Build the portable ZIP with the built-in office
         run: python -B package.py --runner dist/native/${{ matrix.executable }} --output dist/office-studio-${{ matrix.target }}.zip
       - name: Check the ZIP
         run: python -m zipfile -t dist/office-studio-${{ matrix.target }}.zip

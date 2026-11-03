@@ -12,9 +12,10 @@ FILES = (
     "package.py", "test_office.py", "test_providers.py", ".gitignore",
     "launch.py", "configure_providers.py", "loopback_server.py", "room_preview.py", "room_theme.js", "build_runner.py",
     "Start Office Studio.cmd", "Start Office Studio.command", "Configure Providers.cmd", "Configure Providers.command",
-    "test_launcher.py", "test_room_preview.py", "test_setup.py",
+    "test_launcher.py", "test_room_preview.py", "test_room_alert.py", "test_setup.py",
     "docs/setup.png", "docs/office-interior.png", "docs/boardroom.png",
     "assets/ampersand.svg", "assets/OFL-Old-Standard.txt",
+    "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt",
     "AGENTS.md", "MUSE.md", "GEMINI.md", "CLAUDE.md", "CODEX.md",
     "packs/re.json", "packs/law.json", "packs/acct.json", "packs/fin.json", "packs/med.json",
 )

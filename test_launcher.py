@@ -106,7 +106,7 @@ class LauncherTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     launch.find_room("missing.html")
                 private.unlink()
-                self.assertIsNone(launch.find_room())
+                self.assertEqual(launch.find_room(), folder / "room" / "office.html")
 
     def test_configuration_precedes_binding_and_cancellation_reveals_no_input(self):
         order = []

@@ -2,7 +2,7 @@
 
 Office Suite is the workspace you create in Office Studio. Start with the [vertical reel](create-office-reel.mp4) for a walkthrough, or pick a still below for a post.
 
-The 31-second reel follows a fictional business in the public app. It plays silently with on-screen captions. Hudson Table chooses its branding and template, creates a five-desk crew, prepares a local draft, and records its approval. The [office interior in the project walkthrough](https://github.com/mragerlp/office-studio/tree/develop#2-step-inside-the-office-suite) shows the optional 3D room.
+The 31-second reel follows a fictional business through setup and the **Desks & drafts** workspace. It plays silently with on-screen captions. Hudson Table chooses its branding and template, creates a five-desk crew, prepares a local draft, and records its approval. See the [built-in 3D office in the project walkthrough](https://github.com/mragerlp/office-studio/tree/develop#2-step-inside-the-office-suite).
 
 <img src="office-suite-feed-portrait.png" width="270" alt="Office Suite portrait post. The Head Executive connects Research and Legal to the owner's review.">
 
