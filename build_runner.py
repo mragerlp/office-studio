@@ -46,7 +46,7 @@ def check_binary(path, target):
             raise RuntimeError("Expected an arm64 macOS runner.")
 
 
-def build(target, output):
+def build(target, output, signing_identity=None):
     check_platform(target)
     # Keep the data allowlist separate from the broader source handoff list.
     assets = ["index.html", "help.html", "app.js", "appearance.js", "style.css", "room_theme.js", "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt", "assets/ampersand.svg", *(f"packs/{key}.json" for key in ("re", "law", "acct", "fin", "med"))]
@@ -59,6 +59,8 @@ def build(target, output):
                    "--hidden-import", "room_preview"]
         if target == "macos-arm64":
             command.extend(["--target-arch", "arm64"])
+            if signing_identity:
+                command.extend(["--codesign-identity", signing_identity])
         for name in assets:
             command.extend(["--add-data", f"{ROOT / name}:{Path(name).parent.as_posix()}"])
         command.append(str(ROOT / "launch.py"))
@@ -111,8 +113,9 @@ def smoke_room(port, asset_root=ROOT):
         raise RuntimeError("Frozen room presentation does not match the saved office.")
     status, raw = get(frame.port, f"/packs/{workspace['id']}.json")
     pack = json.loads(raw)
-    if status != 200 or len(pack["crew"]) != len(workspace["crew"]) or pack["gates"][0]["owner"] != pack["crew"][1]["name"]:
-        raise RuntimeError("Frozen room did not preserve crew and gate ownership.")
+    if (status != 200 or len(pack["crew"]) != len(workspace["crew"]) or pack["gates"] != []
+            or [rule["owner"] for rule in workspace["gates"]] != ["Specialist fixture with a long name"]):
+        raise RuntimeError("Frozen room must preserve the crew and keep saved policy out of its approval queue.")
     status, javascript = get(frame.port, "/assets/three-r128.min.js")
     if status != 200 or hashlib.sha256(javascript).hexdigest() != "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2":
         raise RuntimeError("Frozen room did not serve its pinned local Three.js.")
@@ -148,7 +151,7 @@ def smoke(target, archive):
                 raise RuntimeError("Public native ZIP must contain only the source allowlist and one runner, with no private room.")
             for entry in bundle.infolist():
                 native = entry.filename == "office-studio/office-studio-runner"
-                mode = 0o755 if entry.filename.endswith(".command") or native else 0o644
+                mode = 0o755 if entry.filename.endswith((".command", ".sh")) or native else 0o644
                 if entry.create_system != 3 or stat.S_IMODE(entry.external_attr >> 16) != mode:
                     raise RuntimeError("ZIP executable permissions were not preserved.")
             bundle.extractall(extracted)
@@ -214,9 +217,10 @@ def main():
     parser.add_argument("--target", required=True, choices=TARGETS)
     parser.add_argument("--output", type=Path, default=ROOT / "dist" / "native")
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--signing-identity", help="Existing macOS signing identity for the runner and its embedded libraries")
     args = parser.parse_args()
     if args.action == "build":
-        print(build(args.target, args.output))
+        print(build(args.target, args.output, args.signing_identity))
     elif args.archive is None:
         parser.error("smoke requires --archive")
     else:

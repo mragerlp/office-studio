@@ -258,6 +258,7 @@
   }
 
   for (const b of document.querySelectorAll("[data-login]")) {
+    b.hidden = !auth.supportsLogin(b.dataset.login);
     b.onclick = () => work(() => auth.login(b.dataset.login));
   }
   $("logout").onclick = () =>

@@ -65,7 +65,7 @@ async function stub(req, res) {
   if (url.pathname === "/auth/v1/authorize") {
     assert.equal(query.get("code_challenge_method"), "s256");
     assert.equal(query.get("redirect_to"), siteOrigin + "/");
-    assert(["google", "azure"].includes(query.get("provider")));
+    assert(["google", "azure", "apple", "custom:chatgpt"].includes(query.get("provider")));
     const code = randomUUID();
     codes.set(code, {
       owner: query.get("provider"),
@@ -258,15 +258,18 @@ try {
     "--output",
     build,
   ];
-  const compiled = spawnSync(python, args, {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      SUPABASE_URL: serviceOrigin,
-      SUPABASE_PUBLISHABLE_KEY: apiKey,
-    },
-  });
-  assert.equal(compiled.status, 0, compiled.error?.message || compiled.stderr);
+  const compile = (...flags) => {
+    const compiled = spawnSync(python, [...args, ...flags], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        SUPABASE_URL: serviceOrigin,
+        SUPABASE_PUBLISHABLE_KEY: apiKey,
+      },
+    });
+    assert.equal(compiled.status, 0, compiled.error?.message || compiled.stderr);
+  };
+  compile();
   site = await listen(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const name = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
@@ -368,9 +371,14 @@ try {
     assert.equal(await el("destination").textContent(), "");
     assert.equal(await el("connection-status").textContent(), "");
   };
+  await page.goto(siteOrigin + "/get.html");
+  assert.equal(await page.getByText("Download not yet published.", {exact: true}).count(), 2);
+  await page.getByRole("link", {name: "Open web app"}).click();
+  await el("login").waitFor();
   await page.goto(siteOrigin + "/?code=unexpected");
   await waitText("notice", "expired");
   assert.equal(sessions.size, 0);
+  assert.equal(await page.getByRole("button", { name: "Continue with ChatGPT" }).count(), 0);
   await chooseLogin("Google");
   const room = await create("Juniper Workshop");
   const waitForFourthDesk = async () => {
@@ -718,12 +726,27 @@ try {
   );
   assert.equal(await el("runs").locator(".draft-card").count(), 0);
   await clear();
+  await chooseLogin("Apple");
+  assert.equal(await el("offices").locator("option").count(), 0);
+  await clear();
+  const releaseBase = "https://releases.example.invalid/";
+  compile("--enable-chatgpt-sign-in", "--windows-download", releaseBase + "windows.zip",
+    "--macos-download", releaseBase + "mac.zip");
+  await page.goto(siteOrigin + "/get.html");
+  for (const [label, file] of [["Windows", "windows.zip"], ["macOS", "mac.zip"]]) {
+    assert.equal(await page.getByRole("link", {name: "Download for " + label}).getAttribute("href"), releaseBase + file);
+  }
+  await page.getByRole("link", {name: "Open web app"}).click();
+  await page.reload();
+  await chooseLogin("ChatGPT");
+  assert.equal(await el("offices").locator("option").count(), 0);
+  await clear();
   assert.equal(sessions.size, 0);
   assert.deepEqual(errors, []);
   console.log(
     "PASS Hosted Chromium " +
       browser.version() +
-      " · Google/Microsoft PKCE with mocked service, real WebGL, two offices, malformed input, lost-result retry, scoped source, explicit consent, approve/download, narrow viewport, logout, zero external requests.",
+      " · Google/Microsoft/Apple and opt-in ChatGPT PKCE with mocked service, real WebGL, two offices, malformed input, lost-result retry, scoped source, explicit consent, approve/download, narrow viewport, logout, zero external requests.",
   );
 } finally {
   await browser?.close();
