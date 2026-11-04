@@ -16,6 +16,8 @@ FILES = (
     "test_launcher.py", "test_room_preview.py", "test_room_alert.py", "test_setup.py", "test_package.py",
     "test_reconciliation_backend.py", "tests/idle-mark.cjs", "tests/frontend-reconciliation.cjs",
     "docs/setup.png", "docs/office-interior.png", "docs/boardroom.png",
+    "docs/CURRENT-STATE.md", "docs/research/2026-11-03-scaling/README.md",
+    "docs/research/2026-11-03-scaling/sources.md",
     "examples/friday-inquiry.txt",
     "assets/ampersand.svg", "assets/OFL-Old-Standard.txt",
     "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt",

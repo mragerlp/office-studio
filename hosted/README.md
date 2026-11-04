@@ -1,5 +1,7 @@
 # Hosted Office Studio pilot
 
+Read [the current handoff state and four open hosted findings](../docs/CURRENT-STATE.md#open-gates-and-highest-priority-work) before using this setup guide. Customer readiness remains **HOLD**: current auth/browser evidence is mocked, and live identity, isolation, revocation and provider access require separate verification. ChatGPT stays hidden by default; app sign-in does not establish consumer-subscription inference/API entitlement.
+
 This is the web edition of **choose a text file → assign a desk → review its draft**. It uses Supabase Auth, private rows in Postgres and an Edge Function for provider connections. The desktop launchers use their own local SQLite data. A hosted sign-in opens that user's hosted offices.
 
 ## A first walkthrough

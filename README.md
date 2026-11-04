@@ -1,5 +1,7 @@
 # Office Studio
 
+**Igor and the next agent: [start with the current state and handoff](docs/CURRENT-STATE.md).** This review branch packages the reconciled candidate; Mac rebuild/download acceptance and hosted customer readiness remain **HOLD**. The page distinguishes implemented code, available artifacts and prior test evidence.
+
 Office Studio is a local web app for your business's crew. Give the Head Executive a brief for the morning meeting, or ask a specialist to draft a client update. Each desk can use a different model. The owner reviews the draft and records a decision in the boardroom.
 
 The original 3D office and signature ampersand come from **Beyder & Co.** When a saved draft from the Head Executive awaits your decision, the header ampersand and room sculpture turn red. Select the header mark to open the draft. Approving or declining the last pending executive draft clears both marks. The idle header glyph uses readable ink when the business accent is hard to see against the selected theme, with no background tile or glow.
@@ -131,7 +133,7 @@ On macOS, use `python3` in place of `py -3`. Tests exercise the local HTTP API, 
 
 With a disposable Studio instance running and Playwright available, run `node tests/idle-mark.cjs http://127.0.0.1:PORT` using the printed port to check the idle header in both themes. Set `PLAYWRIGHT_MODULE` and `CHROME_PATH` to use an existing browser installation.
 
-`node tests/frontend-reconciliation.cjs` starts its own disposable local server for the browser regressions. It uses an existing Playwright/Chrome installation and makes no live provider calls. Native Mac lifecycle checks remain in `macos/tests/test_app.py` and must run on the built Mac app.
+The browser regressions start their own disposable local server. On Windows, run `node tests/frontend-reconciliation.cjs`; on macOS, run `PYTHON="$(command -v python3)" node tests/frontend-reconciliation.cjs`. They use an existing Playwright/Chrome installation and make no live provider calls. Native Mac lifecycle checks remain in `macos/tests/test_app.py` and must run on the built Mac app.
 
 Packaging writes the source edition to `dist/office-studio.zip` from an explicit file list. It includes the 3D room, renderer, launchers, tests, walkthrough images and five packs. Use `--runner` for a platform executable. For a private handoff with a different room, use `--private-room`.
 

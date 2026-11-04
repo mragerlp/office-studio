@@ -1,5 +1,7 @@
 # Office Studio in Xcode
 
+Read [the current handoff state](../docs/CURRENT-STATE.md) first and verify the review branch and source pin. The native target is **Apple Silicon arm64, macOS 13 minimum**. Reconciled Mac delivery remains **HOLD** pending an exact-source rebuild, physical workflow acceptance, authorized Release signing/notarization/stapling, and the exact ZIP's browser-download, extraction and Finder first-launch checks. Earlier Mac previews and Windows tests do not establish those results.
+
 Open OfficeStudio.xcodeproj, choose the shared **OfficeStudio** scheme, and Run.
 The Debug target builds an Apple Silicon app using the existing local server and interface.
 The app opens your browser, keeps its server running while open, and stops the server when you Quit.

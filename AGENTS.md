@@ -1,6 +1,6 @@
 # Contributor instructions
 
-Read this file and [README.md](README.md) before making changes. [help.html](help.html) describes the product workflow. Keep shared contributor rules here; vendor handoff files link back to this document.
+Read this file, [docs/CURRENT-STATE.md](docs/CURRENT-STATE.md), and [README.md](README.md) before making changes. For the Igor reconciliation review, use the review branch identified in CURRENT-STATE and verify its actual pin before applying the general new-feature workflow below; the default branch may not contain this candidate. [help.html](help.html) describes the product workflow. Keep shared contributor rules here; vendor handoff files link back to this document.
 
 ## Start from develop
 
