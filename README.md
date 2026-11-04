@@ -2,7 +2,7 @@
 
 Office Studio is a local web app for your business's crew. Give the Head Executive a brief for the morning meeting, or ask a specialist to draft a client update. Each desk can use a different model. The owner reviews the draft and records a decision in the boardroom.
 
-The original 3D office and signature ampersand come from **Beyder & Co.** When the Head Executive needs a decision, the ampersand beside **Office Studio** and the sculpture in the room both turn red. They return to the business's accent color after the last executive alert clears.
+The original 3D office and signature ampersand come from **Beyder & Co.** When a saved draft from the Head Executive awaits your decision, the header ampersand and room sculpture turn red. Select the header mark to open the draft. Approving or declining the last pending executive draft clears both marks. In dark mode the idle header glyph uses light ink when the business accent is hard to see.
 
 [Run the local app](#start-locally) · [Try the file walkthrough](#give-a-desk-a-file) · [Set up the hosted pilot](hosted/README.md) · [Contributor guide](AGENTS.md)
 
@@ -37,6 +37,8 @@ The [Office Suite media kit](https://github.com/mragerlp/office-studio/tree/deve
 
 **Using a packaged build:** Extract the complete ZIP for your operating system. Double-click **Start Office Studio.command** on an Apple Silicon Mac or **Start Office Studio.cmd** on Windows x64. The launcher starts the server and opens setup in your default browser. Keep its terminal window open while you work. The platform builds include their own runtime.
 
+**Native Mac app development:** Open [the Xcode project](macos/OfficeStudio.xcodeproj) and follow the [Mac build guide](macos/README.md) to build a double-clickable app.
+
 **Using source:** You need Python 3.10+ and a browser. The Python standard library serves the HTML, CSS, and JavaScript directly.
 
 Run the command for your system from the extracted or cloned `office-studio` directory.
@@ -64,8 +66,9 @@ The optional **Find town on map** link opens an OpenStreetMap search only when c
 For a two-minute walkthrough, create a fictional office and open **Desks & drafts**.
 
 1. Add the [sample Friday inquiry](examples/friday-inquiry.txt) under **Working file**. It is also in the extracted ZIP's `examples` folder. The local edition accepts UTF-8 `.txt` and `.md` files up to 32 KiB each.
-2. Select a desk and enter “Draft a reply asking what time works. Leave availability unconfirmed.” Choose the local demo for a rehearsal. For a live draft, review the file, provider and model shown and confirm the transfer.
+2. Select **Guest communications · GUEST DESK** and enter “Draft a reply asking what time works. Leave availability unconfirmed.” Choose **Local demo · this draft only**. With this sample, Guest Desk prepares an offline example reply asking for the guest’s preferred time. For a live draft, review the file, provider and model shown and confirm the transfer.
 3. Prepare the draft, open it in the review inbox, and approve or decline. Approval enables a text download. The draft records its desk and the version of its source file.
+4. To find it again from the room, open **GUEST DESK → Delivered → View approved drafts**. Select the saved item to read its text, source version and decision.
 
 Removing a local original revokes future access to that file. Earlier local drafts retain their text and source label. The hosted pilot uses a different retention rule: removing the original deletes its derived runs and drafts. Already downloaded or transmitted copies remain with their recipients.
 
@@ -123,6 +126,8 @@ py -3 -B package.py
 ```
 
 On macOS, use `python3` in place of `py -3`. Tests exercise the local HTTP API, restart persistence and model selection with synthetic data and mocked provider responses.
+
+With a disposable Studio instance running and Playwright available, run `node tests/idle-mark.cjs http://127.0.0.1:PORT` using the printed port to check the idle header in both themes. Set `PLAYWRIGHT_MODULE` and `CHROME_PATH` to use an existing browser installation.
 
 Packaging writes the source edition to `dist/office-studio.zip` from an explicit file list. It includes the 3D room, renderer, launchers, tests, walkthrough images and five packs. Use `--runner` for a platform executable. For a private handoff with a different room, use `--private-room`.
 

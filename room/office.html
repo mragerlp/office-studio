@@ -17950,14 +17950,16 @@ const UI = {
         <h3 class="eyebrow">Live log</h3><div class="logbox" id="logbox"><ol class="log" id="logList"></ol></div>
         <h3 class="eyebrow">Lane</h3><p class="p-text">${esc(a.specialty)}${a.role ? ' — ' + esc(a.role) : ''}</p>
         <h3 class="eyebrow">Systems</h3><div class="pills">${a.systems.map(x => `<span class="pill">${esc(x)}</span>`).join('') || '<span class="p-text">—</span>'}</div>
-        <h3 class="eyebrow">Delivered</h3>${a.delivered.length ? `<ul class="delivered">${a.delivered.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : '<p class="p-text">Nothing on record yet.</p>'}
+        <h3 class="eyebrow">Delivered</h3>${this.openDelivered ? '<button type="button" class="btn" data-act="delivered">View approved drafts</button>' : a.delivered.length ? `<ul class="delivered">${a.delivered.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : '<p class="p-text">Nothing on record yet.</p>'}
         ${a.held.length ? `<h3 class="eyebrow">Held</h3><ul class="delivered held">${a.held.map(h => `<li><span>${esc(h.need)} <span class="g-meta">· held ${fmtTime(new Date(h.at))}</span></span></li>`).join('')}</ul>` : ''}`;
     const box0 = $('#logbox');
     const keepScroll = !full && box0 ? box0.scrollTop : null;
     const pinned = !full && box0 ? box0.scrollHeight - box0.scrollTop - box0.clientHeight < 30 : true;
     const bodyScroll = !full ? $('#pScroll').scrollTop : 0;
+    const refocusDelivered = !full && document.hasFocus() && document.activeElement?.dataset.act === 'delivered';
     $('#pHead').innerHTML = head;
     $('#pScroll').innerHTML = body;
+    if (refocusDelivered) p.querySelector('[data-act="delivered"]')?.focus({preventScroll: true});
     if (bodyScroll) $('#pScroll').scrollTop = bodyScroll;
     $('#logList').innerHTML = a.log.map(l => this.logLine(l)).join('');
     this.logCount = a.log.length;
@@ -17973,6 +17975,7 @@ const UI = {
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'close') this.deselect();
+    else if (act === 'delivered') this.openDelivered?.(this.selected);
     else if (act === 'approve') this.answer(b.dataset.g, 'approve');
     else if (act === 'decline') this.answer(b.dataset.g, 'decline');
     else if (act === 'reply') this.composeReply(b.dataset.g);

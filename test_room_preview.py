@@ -2,6 +2,8 @@
 import http.client
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 import tempfile
 import threading
@@ -88,7 +90,7 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), self.html)
         self.assertEqual(self.request("/", headers={})[0], 200)
 
-    def test_all_shipped_packs_and_missing_brief_fields_are_adapted(self):
+    def test_room_keeps_standing_rules_out_of_actionable_gates(self):
         for key in ("re", "law", "acct", "fin", "med"):
             pack = json.loads((server.ROOT / "packs" / f"{key}.json").read_text(encoding="utf-8"))
             item = self.create(crew=pack["crew"], gates=pack["gates"], rules=pack["rules"])
@@ -100,8 +102,8 @@ class RoomPreviewTests(unittest.TestCase):
         item = self.create(gates=[{"owner": "CRIMSON", "need": "Review fictional item", "brief": {}}])
         frame = self.room(item)
         exported = self.request(f"/packs/{item['id']}.json", port=frame.port)[1]
-        self.assertTrue(exported["gates"][0]["brief"]["action"])
-        self.assertTrue(exported["gates"][0]["brief"]["ifDecline"])
+        self.assertEqual(exported["gates"], [])
+        self.assertEqual(self.request(f"/api/workspaces/{item['id']}")[1]["gates"], item["gates"])
 
     def test_custom_roster_uses_renderer_keys_without_changing_saved_names(self):
         for name in ("OWNER", "Crimson", "CRIMSON-LONG-NAME"):
@@ -126,7 +128,8 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertEqual(len(keys), len(names))
         self.assertTrue(all(re.fullmatch(r"[A-Z][A-Z0-9 -]{0,13}", n) for n in keys))
         self.assertEqual(len(set(re.sub(r"[^a-z0-9]+", "-", n.lower()).strip("-") for n in keys)), len(keys))
-        self.assertEqual([g["owner"] for g in pack["gates"]], keys)
+        self.assertEqual(pack["gates"], [])
+        self.assertEqual([g["owner"] for g in item["gates"]], names)
         data = self.presentation(self.request(frame.path + "?" + frame.query, port=frame.port)[1])
         self.assertEqual([a["agent"] for a in data["agents"]], keys)
         self.assertEqual([a["title"] for a in data["agents"]], ["Owner", "Head Executive", *names[2:-1], "Legal Review"])
@@ -298,7 +301,7 @@ class RoomPreviewTests(unittest.TestCase):
         frame = self.room(item)
         raw = self.request(frame.path + "?" + frame.query, port=frame.port)[1]
         data = self.presentation(raw)
-        self.assertEqual(set(data), {"name", "color", "logo", "agents", "studioOrigin"})
+        self.assertEqual(set(data), {"name", "color", "logo", "agents", "studioOrigin", "deskHistory"})
         self.assertEqual(data["studioOrigin"], f"http://127.0.0.1:{self.httpd.server_port}")
         self.assertEqual(data["name"], malicious)
         self.assertEqual(data["agents"][0]["title"], title)
@@ -308,6 +311,56 @@ class RoomPreviewTests(unittest.TestCase):
         self.assertNotIn(b"secret-routing-fixture", raw)
         self.assertNotIn(b"private drafting fixture", raw)
         self.assertEqual(self.source.read_bytes(), self.html)
+
+    def test_delivered_opens_only_current_desks_saved_approvals(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node is required for the host navigation behavior check.")
+        script = r"""
+const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm");
+const elements = new Map(), events = {};
+function element() {
+  return {children:[], dataset:{}, handlers:{}, addEventListener(k,f){this.handlers[k]=f;},
+    setAttribute(k,v){this[k]=v;}, append(...items){this.children.push(...items);},
+    replaceChildren(...items){this.children=items;}, showModal(){this.open=true;},
+    close(){this.open=false;}, focus(){this.focused=true;}, removeAttribute(k){delete this[k];}};
+}
+function byId(id) {
+  if (!elements.has(id)) elements.set(id,element());
+  return elements.get(id);
+}
+const ctx = vm.createContext({document:{getElementById:byId,createElement:element},
+  window:{addEventListener(k,f){events[k]=f;}}, URL, structuredClone,
+  location:new URL("http://127.0.0.1:9000"), fetch:()=>new Promise(()=>{})});
+vm.runInContext(fs.readFileSync('app.js','utf8'),ctx);
+const s = vm.runInContext('state',ctx), origin = 'http://127.0.0.1:9001';
+const sent = [], frame = {src: origin+'/room/index.html', contentWindow:{postMessage(d){sent.push(d);}}};
+const guest = {name:'GUEST DESK',specialty:'Reception',appearance:{title:'Staff'}};
+const other = {name:'OPERATIONS',specialty:'Scheduling',appearance:{title:'Staff'}};
+const draft = {agent:'GUEST DESK',status:'approved',brief:'Friday visit',provider:'demo',
+  text:'Fictional approved reply',id:'one',source:{name:'friday.txt',version:'123456789abc'}};
+s.workspace = {id:'office-a',crew:[other,guest],drafts:[draft,{...draft,id:'two',agent:'OPERATIONS'},
+  {...draft,id:'three',status:'pending'},{...draft,id:'four',status:'declined'}]};
+s.selectedId=s.roomFrameId=s.workspace.id; s.roomFrame=frame;
+const dialog=byId('desk-history'), list=byId('desk-history-list');
+function open(seat,source=frame.contentWindow, sender=origin) {
+  events.message({source,origin:sender,data:{type:'office-studio:open-delivered',seat}});
+}
+open(1,{});open(1,frame.contentWindow,'https://example.invalid');open(12);open('1');assert.ok(!dialog.open);
+open(1);assert.equal(dialog.open,true);assert.equal(list.children.length,1);
+const first=list.children[0];
+first.handlers.click();
+assert.equal(s.draftId,'one');assert.equal(byId('preview-text').textContent,draft.text);
+assert.equal(byId('preview-source').textContent,'Source file: friday.txt · 12345678');
+assert.equal(byId('preview-status').textContent,'approved');assert.match(byId('preview-agent').textContent,/GUEST DESK/);
+assert.ok(!JSON.stringify(sent).includes('Friday') && !JSON.stringify(sent).includes('friday.txt'));
+s.selectedId=s.roomFrameId='office-b';s.epoch++;s.draftId='';s.workspace={id:'office-b',crew:[other,guest],drafts:[]};
+s.roomFrame={...frame,contentWindow:{postMessage(){}}};
+open(1);assert.ok(!dialog.open);first.handlers.click();assert.equal(s.draftId,'');
+open(1,s.roomFrame.contentWindow);assert.ok(dialog.open);assert.equal(list.children[0].textContent,'No approved drafts for this desk yet.');
+"""
+        result = subprocess.run([node, "-e", script], cwd=server.ROOT, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_empty_legacy_roster_keeps_2d_fallback_without_inventing_desks(self):
         item = self.create()

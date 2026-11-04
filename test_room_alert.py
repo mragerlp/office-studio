@@ -63,26 +63,14 @@ function boot({brand='#123456',later=false,legacy=false,seed=true}={}){
   return{sculpture,state,send,update,expect,brand,executive,sandbox,reported,UI};
 }
 let b=boot();
-b.expect('#a70008',true); // Initial simulated executive gate is a real displayed approval.
-const signal=pending=>({type:'office-studio:room-executive-alert',pending});
-assert.deepEqual(b.reported,[signal(true)]);
-const open={type:'office-studio:open-executive-alert'};
-b.send(open,'https://example.org');b.send(open,undefined,{});b.send({...open,other:true});
-assert.equal(b.UI.selected,'');
-b.send(open);assert.equal(b.UI.selected,b.executive);
-b.state.approvals=[];b.update();b.expect(b.brand,false);
-const queue=b.state.approvals;
-b.state.approvals=new Proxy(queue,{get:(target,key,receiver)=>{if(key==='some'||key==='find')throw Error('Per-frame approval scan');return Reflect.get(target,key,receiver);}});
-for(let i=0;i<1000;i++)assert.equal(b.sculpture.fast,false);
-b.state.approvals=queue;
-b.send({type:'office-studio:review-signal',pending:true,executivePending:false});b.expect(b.brand,true);
+b.expect(b.brand,false); // A room's simulated executive gate is not a saved draft.
+assert.deepEqual(b.reported,[]);
+b.send({type:'office-studio:review-signal',pending:true,executivePending:false});b.expect(b.brand,false);
 b.send({type:'office-studio:review-signal',pending:true,executivePending:true});b.expect('#a70008',true);
+b.state.approvals=[];b.update();b.expect('#a70008',true); // Room simulation cannot clear saved work.
 b.send({type:'office-studio:review-signal',pending:false,executivePending:false});b.expect(b.brand,false);
-assert.deepEqual(b.reported,[signal(true),signal(false)]); // No echo or repeated messages.
-b.state.approvals=[{agentId:'host',simulated:false}];b.sculpture.fast=true;b.update();b.expect(b.brand,true);
-b.state.approvals.push({agentId:'crimson',simulated:true});b.update();b.expect('#a70008',true);
-b.state.approvals=b.state.approvals.filter(g=>g.agentId!=='crimson');b.update();b.expect(b.brand,true);
-b.state.approvals=[];b.sculpture.fast=false;b.update();b.expect(b.brand,false);
+b.state.approvals=[{agentId:'crimson',simulated:false}];b.sculpture.fast=true;b.update();
+b.expect(b.brand,false); // Renderer activity cannot create a saved executive alert.
 for(const [data,origin,from]of [
  [{type:'office-studio:review-signal',pending:true,executivePending:true},'https://example.org',undefined],
  [{type:'office-studio:review-signal',pending:true,executivePending:'true'},undefined,undefined],
@@ -91,12 +79,9 @@ for(const [data,origin,from]of [
  [{type:'other',pending:true,executivePending:true},undefined,undefined]]){
  b.send(data,origin,from);b.expect(b.brand,false);
 }
-b.send({type:'office-studio:review-signal',pending:true});b.expect(b.brand,true); // Old parent remains generic.
-b.send({type:'office-studio:review-signal',pending:false});b.expect(b.brand,false);
-b=boot({later:true});b.expect('#a70008',true);
-b.state.approvals=[{agentId:'crimson',simulated:true}];b.update();b.expect(b.brand,false); // Transport chief is not saved executive.
-b.state.approvals.push({agentId:'host',simulated:true});b.update();b.expect('#a70008',true);
-b=boot({legacy:true});b.expect('#a70008',true);
+b.send({type:'office-studio:review-signal',pending:true});b.expect(b.brand,false); // A generic flag has no owner.
+b=boot({later:true});b.expect(b.brand,false);
+b=boot({legacy:true});b.expect(b.brand,false);
 b=boot({brand:'#000000',seed:false});b.expect('#000000',false);
 b.send({type:'office-studio:review-signal',pending:true,executivePending:true});b.expect('#a70008',true);
 b.send({type:'office-studio:review-signal',pending:false,executivePending:false});b.expect('#000000',false);
@@ -104,7 +89,7 @@ console.log('Full adapter: seeded/native/host/mixed/legacy/later-executive/black
 """
         self.run_node(script)
 
-    def test_studio_header_combines_sources_and_drops_retired_room(self):
+    def test_studio_header_follows_saved_executive_work_only(self):
         self.run_node(r"""
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 const assert = require('node:assert/strict');
@@ -138,17 +123,20 @@ function notify(pending,source=frame.contentWindow,origin=roomOrigin,extra={}) {
 function expect(red) {assert.equal(mark.dataset.executiveAlert,String(red));}
 ctx.updateReviewMark(); expect(false);
 notify(true,{});notify(true,frame.contentWindow,'https://example.org');notify('true');notify(true,undefined,undefined,{extra:0});expect(false);
-notify(true);expect(true);assert.match(mark.title,/Principal.*3D office/);assert.equal(mark.dataset.active,'true');
-mark.events.click();assert.equal(frame.focused,true);
-assert.deepEqual(frame.contentWindow.sent,{type:'office-studio:open-executive-alert'});
-studio.workspace.drafts.push({agent:'CHIEF',status:'pending',id:'example'});
-notify(false);expect(true);assert.match(mark.title,/Principal.*inbox/);
-notify(true);studio.workspace.drafts[0].status='approved';ctx.updateReviewMark();expect(true);
-notify(false);expect(false);
-studio.workspace.drafts.push({agent:'DESK',status:'pending'});ctx.updateReviewMark();expect(false);assert.equal(mark.dataset.active,'true');
-notify(true);ctx.releaseRoomFrame();expect(false);assert.equal(frame.removed,true);
-studio.workspace={id:'office-two',crew:[chief],drafts:[]};studio.roomFrameId='office-two';studio.roomFrame=room();
-notify(true);expect(false);notify(true,studio.roomFrame.contentWindow);expect(true);
+notify(true);expect(false);assert.equal(mark.dataset.active,'false');
+studio.workspace.drafts.push({agent:'CHIEF',status:'pending',id:'example'},{agent:'DESK',status:'pending',id:'other'});
+ctx.updateReviewMark();expect(true);assert.match(mark.title,/Principal.*inbox/);
+ctx.syncRoomReviewSignal();
+assert.deepEqual(frame.contentWindow.sent,{type:'office-studio:review-signal',pending:true,executivePending:true});
+studio.workspace.drafts[0].status='approved';ctx.updateReviewMark();ctx.syncRoomReviewSignal();
+expect(false);assert.equal(mark.dataset.active,'false');
+assert.deepEqual(frame.contentWindow.sent,{type:'office-studio:review-signal',pending:true,executivePending:false});
+notify(true);expect(false);
+ctx.releaseRoomFrame();expect(false);assert.equal(frame.removed,true);
+studio.roomFrameId=studio.workspace.id;studio.roomFrame=room();
+ctx.updateReviewMark();ctx.syncRoomReviewSignal();notify(true,studio.roomFrame.contentWindow);expect(false);
+assert.equal(studio.roomFrame.contentWindow.sent.executivePending,false);
+
 """)
 
 
