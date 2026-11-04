@@ -2,7 +2,7 @@
 
 Office Studio is a local web app for your business's crew. Give the Head Executive a brief for the morning meeting, or ask a specialist to draft a client update. Each desk can use a different model. The owner reviews the draft and records a decision in the boardroom.
 
-The original 3D office and signature ampersand come from **Beyder & Co.** When a saved draft from the Head Executive awaits your decision, the header ampersand and room sculpture turn red. Select the header mark to open the draft. Approving or declining the last pending executive draft clears both marks. In dark mode the idle header glyph uses light ink when the business accent is hard to see.
+The original 3D office and signature ampersand come from **Beyder & Co.** When a saved draft from the Head Executive awaits your decision, the header ampersand and room sculpture turn red. Select the header mark to open the draft. Approving or declining the last pending executive draft clears both marks. The idle header glyph uses readable ink when the business accent is hard to see against the selected theme, with no background tile or glow.
 
 [Run the local app](#start-locally) · [Try the file walkthrough](#give-a-desk-a-file) · [Set up the hosted pilot](hosted/README.md) · [Contributor guide](AGENTS.md)
 
@@ -88,6 +88,8 @@ The server listens on loopback and saves offices, uploaded logos, drafts, and de
 
 New desks default to the offline demo. You can save a host-allowed model preference before adding an API key. If the provider is unavailable, live drafting stays disabled until it is configured or you explicitly select the demo.
 
+The local app retains a request token for an interrupted submission, including a brief without a file. Retrying the same request can recover its saved result. An interrupted offline demo can resume; an uncertain live call stays held to avoid automatically charging twice. Incomplete provider replies are rejected instead of becoming approvable drafts. These local protections do not establish hosted recovery or live provider access.
+
 To start a session with live providers, open **Configure Providers.command** on macOS or **Configure Providers.cmd** on Windows. Choose a provider, enter the model IDs available to your account, then enter its API key in the hidden terminal prompt. Repeat for another provider or press Enter to launch. These settings last for that server session. Alternatively, configure the following environment variables before launch.
 
 | Provider | API key variable    | Default model            | Optional allowed models   |
@@ -128,6 +130,8 @@ py -3 -B package.py
 On macOS, use `python3` in place of `py -3`. Tests exercise the local HTTP API, restart persistence and model selection with synthetic data and mocked provider responses.
 
 With a disposable Studio instance running and Playwright available, run `node tests/idle-mark.cjs http://127.0.0.1:PORT` using the printed port to check the idle header in both themes. Set `PLAYWRIGHT_MODULE` and `CHROME_PATH` to use an existing browser installation.
+
+`node tests/frontend-reconciliation.cjs` starts its own disposable local server for the browser regressions. It uses an existing Playwright/Chrome installation and makes no live provider calls. Native Mac lifecycle checks remain in `macos/tests/test_app.py` and must run on the built Mac app.
 
 Packaging writes the source edition to `dist/office-studio.zip` from an explicit file list. It includes the 3D room, renderer, launchers, tests, walkthrough images and five packs. Use `--runner` for a platform executable. For a private handoff with a different room, use `--private-room`.
 

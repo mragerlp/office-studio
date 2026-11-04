@@ -19,6 +19,18 @@
   const knownIds = new Map();
   let office, attempts = 0, queued = false, ownerReviewPending = false, ownerExecutivePending = false,
     reviewSculpture = null, refreshSculptureAlert = null;
+  function reportRoomState(status) {
+    if (window.parent !== window)
+      window.parent.postMessage({type: "office-studio:room-state", status}, presentation.studioOrigin);
+  }
+  function waitForFirstFrame(count = 0) {
+    const renderer = office?.renderer;
+    if (renderer?.info?.render?.frame > 0 && !renderer.getContext().isContextLost()) {
+      reportRoomState("ready");
+      renderer.domElement.addEventListener("webglcontextlost", () => reportRoomState("failed"), {once: true});
+    } else if (count < 300) setTimeout(() => waitForFirstFrame(count + 1), 100);
+    else reportRoomState("failed");
+  }
 
   function markReviewSignal() {
     if (!reviewSculpture) return;
@@ -200,7 +212,10 @@
     if (!office || !office.UI || !office.OFFICE_STATE || !document.querySelector("#topbar .brand") ||
         typeof AGENT_COLORS !== "object") {
       if (++attempts < 300) setTimeout(start, 100);
-      else document.documentElement.dataset.officeTheme = "unsupported";
+      else {
+        document.documentElement.dataset.officeTheme = "unsupported";
+        reportRoomState("failed");
+      }
       return;
     }
     const state = office.OFFICE_STATE;
@@ -262,6 +277,7 @@
     }
     document.title = presentation.name + " · Office Suite";
     document.documentElement.dataset.officeTheme = "ready";
+    waitForFirstFrame();
     new MutationObserver(schedule).observe(document.body, {childList: true, subtree: true, characterData: true});
     decorate();
   }

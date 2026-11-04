@@ -20,16 +20,16 @@ class DraftProvidersTest(unittest.TestCase):
     def test_provider_requests_and_text_extraction(self):
         examples = {
             "openai": ("api.openai.com", "/v1/responses", {
-                "output": [{"type": "message", "content": [{"type": "output_text", "text": "Draft"}]}],
+                "status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Draft"}]}],
             }),
             "meta": ("api.meta.ai", "/v1/chat/completions", {
-                "choices": [{"message": {"content": "Draft", "reasoning_content": "private reasoning"}}],
+                "choices": [{"finish_reason": "stop", "message": {"content": "Draft", "reasoning_content": "private reasoning"}}],
             }),
             "anthropic": ("api.anthropic.com", "/v1/messages", {
-                "content": [{"type": "text", "text": "Draft"}],
+                "stop_reason": "end_turn", "content": [{"type": "text", "text": "Draft"}],
             }),
             "gemini": ("generativelanguage.googleapis.com", "/v1beta/models/example-model:generateContent", {
-                "candidates": [{"content": {"parts": [{"thought": True, "text": "omitted"}, {"text": "Draft"}]}}],
+                "candidates": [{"finishReason": "STOP", "content": {"parts": [{"thought": True, "text": "omitted"}, {"text": "Draft"}]}}],
             }),
         }
         for provider, (host, path, response) in examples.items():
@@ -60,9 +60,9 @@ class DraftProvidersTest(unittest.TestCase):
             post.assert_not_called()
 
     def test_model_overrides_never_change_provider_hosts(self):
-        fixtures = {"openai": {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Draft"}]}]},
-                    "anthropic": {"content": [{"type": "text", "text": "Draft"}]},
-                    "gemini": {"candidates": [{"content": {"parts": [{"text": "Draft"}]}}]}}
+        fixtures = {"openai": {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Draft"}]}]},
+                    "anthropic": {"stop_reason": "end_turn", "content": [{"type": "text", "text": "Draft"}]},
+                    "gemini": {"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "Draft"}]}}]}}
         for provider, response in fixtures.items():
             _, secret, variable = providers.PROVIDERS[provider]
             with self.subTest(provider=provider), patch.dict(os.environ, {

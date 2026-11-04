@@ -326,12 +326,18 @@ function applyAccent(value) {
   const charcoalLuminance = ((60 / 255 + 0.055) / 1.055) ** 2.4;
   const readableOnCharcoal = (luminance + 0.05) / (charcoalLuminance + 0.05) >= 3;
   document.documentElement.style.setProperty("--dark-idle-mark", readableOnCharcoal ? color : "var(--ink)");
+  const cream = [245, 243, 237].map(x => ((x / 255 + 0.055) / 1.055) ** 2.4);
+  const creamLuminance = cream[0] * 0.2126 + cream[1] * 0.7152 + cream[2] * 0.0722;
+  const readableOnCream = (Math.max(luminance, creamLuminance) + 0.05) /
+    (Math.min(luminance, creamLuminance) + 0.05) >= 3;
+  document.documentElement.style.setProperty("--light-idle-mark", readableOnCream ? color : "#000000");
   document.documentElement.style.setProperty(
     "--accent-ink",
     luminance > 0.179 ? "#000000" : "#ffffff",
   );
 }
 function resetWorkspaceForms() {
+  clearDraftPreview();
   if ($("desk-history").open) $("desk-history").close();
   $("desk-history-list").replaceChildren();
   $("desk-history-title").textContent = "";
@@ -980,7 +986,7 @@ function displayOfficeView(entry) {
     fullLink.target = fullWindow ? "_self" : "_blank";
     fullLink.textContent = fullWindow ? "Back to workspace" : "Open room in full tab ↗";
   } else fullLink.removeAttribute("href");
-  $("room-availability").textContent = entry?.pending
+  $("room-availability").textContent = entry?.pending || (ready && !entry.rendered)
     ? "Opening your office…"
     : ready
       ? "3D office · simulated activity"
@@ -1006,10 +1012,21 @@ function releaseRoomFrame() {
   if (!state.roomFrameId) return;
   const entry = state.rooms.get(state.roomFrameId);
   if (entry) entry.frame = null;
+  if (state.roomFrame.roomReadyTimer) clearTimeout(state.roomFrame.roomReadyTimer);
   // A new browsing context also rejects late messages from the retired room.
   state.roomFrame.remove();
   state.roomFrame = null;
   state.roomFrameId = "";
+}
+function roomFailed(frame) {
+  const current = state.rooms.get(state.roomFrameId);
+  if (frame !== state.roomFrame || !current || !isCurrent(state.roomFrameId, current.epoch)) return;
+  current.url = null;
+  current.pending = false;
+  current.rendered = false;
+  current.view = "desks";
+  releaseRoomFrame();
+  displayOfficeView(current);
 }
 function ensureRoomFrame(entry, workspace, reload) {
   if (state.roomFrame && (reload || state.roomFrameId !== workspace.id))
@@ -1025,14 +1042,9 @@ function ensureRoomFrame(entry, workspace, reload) {
     frame.addEventListener("load", syncRoomReviewSignal);
     frame.addEventListener("load", syncRoomAppearance);
     frame.setAttribute("aria-describedby", "room-disclosure");
-    frame.addEventListener("error", () => {
-      const current = state.rooms.get(state.roomFrameId);
-      if (frame !== state.roomFrame || !current || !isCurrent(state.roomFrameId, current.epoch)) return;
-      current.url = null;
-      current.view = "desks";
-      releaseRoomFrame();
-      displayOfficeView(current);
-    });
+    frame.addEventListener("error", () => roomFailed(frame));
+    entry.rendered = false;
+    frame.roomReadyTimer = setTimeout(() => roomFailed(frame), 35000);
     state.roomFrame = frame;
     $("room-frames").append(frame);
   }
@@ -1236,7 +1248,7 @@ function renderDrafts() {
   $("pending-count").textContent = String(pending);
   $("table-count").textContent = pending
     ? `${pending} draft${pending === 1 ? "" : "s"} waiting for you`
-    : "Your decisions come here";
+    : drafts.length ? `${drafts.length} saved decision${drafts.length === 1 ? "" : "s"}` : "Your decisions come here";
   const list = $("draft-list");
   list.replaceChildren();
   if (!drafts.length)
@@ -1264,6 +1276,7 @@ function renderDrafts() {
     item.addEventListener("click", () => {
       state.draftId = draft.id;
       renderDrafts();
+      $("preview-brief").focus();
     });
     list.append(item);
   }
@@ -1274,7 +1287,7 @@ function renderDrafts() {
       "";
   const draft = drafts.find((d) => d.id === state.draftId);
   $("draft-preview").hidden = !draft;
-  if (!draft) return;
+  if (!draft) { clearDraftPreview(); return; }
   $("preview-status").textContent = draft.status;
   $("preview-status").className = `state-pill ${draft.status}`;
   $("preview-provider").textContent =
@@ -1296,6 +1309,16 @@ function renderDrafts() {
       : draft.status === "declined"
         ? "Declined and kept here for reference. Prepare a new draft to revise the work."
         : "Review the complete text. Your decision is a record only.";
+}
+function clearDraftPreview() {
+  $("draft-preview").hidden = true;
+  for (const id of ["preview-status", "preview-provider", "preview-brief", "preview-agent",
+    "preview-source", "preview-text", "decision-note"]) $(id).textContent = "";
+  $("preview-status").className = "state-pill";
+  $("preview-source").hidden = true;
+  $("decision-buttons").hidden = true;
+  $("download-draft").hidden = true;
+  $("download-draft").removeAttribute("href");
 }
 function openDeskHistory(seat) {
   const office = state.workspace;
@@ -1366,6 +1389,19 @@ window.addEventListener("message", (event) => {
     event.origin !== new URL(frame.src).origin
   )
     return;
+  if (event.data?.type === "office-studio:room-state") {
+    if (Array.isArray(event.data) || Object.keys(event.data).length !== 2) return;
+    if (event.data.status === "failed") roomFailed(frame);
+    else if (event.data.status === "ready") {
+      const entry = state.rooms.get(state.roomFrameId);
+      if (!entry || !isCurrent(state.roomFrameId, entry.epoch)) return;
+      clearTimeout(frame.roomReadyTimer);
+      frame.roomReadyTimer = null;
+      entry.rendered = true;
+      displayOfficeView(entry);
+    }
+    return;
+  }
   if (event.data?.type === "office-studio:open-delivered") {
     if (Object.keys(event.data).length === 2 && Number.isInteger(event.data.seat) &&
         event.data.seat >= 0 && event.data.seat < state.workspace.crew.length) openDeskHistory(event.data.seat);
@@ -1641,17 +1677,15 @@ $("draft-form").addEventListener("submit", (event) => {
   $("reset-attempt").hidden = true;
   mutateWorkspace(
     "/drafts",
-    file ? async (id, epoch) => {
+    async (id, epoch) => {
       body.requestId = await fileAttempt(id, epoch, body);
       return body;
-    } : body,
+    },
     (workspace) => {
-      const prepared = file
-        ? workspace.drafts.find((draft) => draft.requestId === body.requestId)
-        : workspace.drafts.at(-1);
+      const prepared = workspace.drafts.find((draft) => draft.requestId === body.requestId);
       state.draftId = prepared?.id || "";
       state.latestDraftId = state.draftId;
-      if (file) forgetFileAttempt();
+      forgetFileAttempt();
       $("share-file").checked = false;
       $("review-latest").hidden = !state.latestDraftId;
       $("draft-feedback").textContent = "Ready in your approval inbox.";

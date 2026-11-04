@@ -133,6 +133,8 @@ def generate_draft(provider, instruction, brief, model=None, *, agent=None, atta
                 "model": model, "input": brief, "instructions": system,
                 "store": False, "max_output_tokens": 1024,
             })
+            if result.get("status") != "completed":
+                raise ProviderError(f"{label} did not complete its reply. No draft was saved; review the request before trying again.")
             parts = [p["text"] for item in result["output"] if item.get("type") == "message"
                      for p in item["content"] if p.get("type") == "output_text"]
         elif provider == "anthropic":
@@ -140,12 +142,16 @@ def generate_draft(provider, instruction, brief, model=None, *, agent=None, atta
                 "x-api-key": key, "anthropic-version": "2023-06-01",
             }, {"model": model, "max_tokens": 1024, "system": system,
                 "messages": [{"role": "user", "content": brief}]})
+            if result.get("stop_reason") not in ("end_turn", "stop_sequence"):
+                raise ProviderError(f"{label} did not complete its reply. No draft was saved; review the request before trying again.")
             parts = [p["text"] for p in result["content"] if p.get("type") == "text"]
         elif provider == "meta":
             result = _post("api.meta.ai", "/v1/chat/completions", {"Authorization": f"Bearer {key}"}, {
                 "model": model, "max_completion_tokens": 1024,
                 "messages": [{"role": "developer", "content": system}, {"role": "user", "content": brief}],
             })
+            if result["choices"][0].get("finish_reason") != "stop":
+                raise ProviderError(f"{label} did not complete its reply. No draft was saved; review the request before trying again.")
             parts = [result["choices"][0]["message"]["content"]]
         else:
             path = f"/v1beta/models/{quote(model, safe='')}:generateContent"
@@ -154,6 +160,8 @@ def generate_draft(provider, instruction, brief, model=None, *, agent=None, atta
                 "contents": [{"role": "user", "parts": [{"text": brief}]}],
                 "generationConfig": {"maxOutputTokens": 1024},
             })
+            if result["candidates"][0].get("finishReason") != "STOP":
+                raise ProviderError(f"{label} did not complete its reply. No draft was saved; review the request before trying again.")
             parts = [p["text"] for p in result["candidates"][0]["content"]["parts"]
                      if "text" in p and not p.get("thought")]
         answer = "\n".join(parts).strip()

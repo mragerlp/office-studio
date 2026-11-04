@@ -659,7 +659,7 @@ class Handler(BaseHTTPRequestHandler):
         self.json(200, item)
 
     def create_draft(self, ident, data):
-        """Reserve a file handoff before generation, then commit its result exactly once locally."""
+        """Reserve capacity before generation, then commit each request once locally."""
         providers = importlib.import_module("providers")
         store = self.server.store
         fields(data, {"provider", "model", "agent", "brief", "fileId", "fileVersion", "requestId", "shareFile"})
@@ -682,9 +682,13 @@ class Handler(BaseHTTPRequestHandler):
                 raise APIError("File sharing confirmation must be true or false.")
             if data["provider"] != "demo" and data.get("shareFile") is not True:
                 raise APIError("Confirm sharing the selected file with this provider and model.")
-        fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True).encode("ascii")).hexdigest() if request_id else None
+        # Older clients may omit the token. They still reserve capacity, but only
+        # a caller-retained token can deduplicate a retry after a lost response.
+        request_id = request_id or uuid.uuid4().hex
+        fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True).encode("ascii")).hexdigest()
+        request_key = (ident, request_id)
         attachment = None
-        with store.connection(write=bool(request_id)) as db:
+        with store.connection(write=True) as db:
             item = store.get(db, ident)
             if has_source:
                 row = source_file(db, ident, data["fileId"], content=True)
@@ -704,12 +708,18 @@ class Handler(BaseHTTPRequestHandler):
                     if prior[1] == "failed":
                         raise APIError("This attempt did not save a draft. To deliberately retry, start a new request.",
                                        409, code="draft_attempt_failed")
-                    raise APIError("This request already started. Check the inbox before starting another.",
-                                   409, code="draft_attempt_started")
+                    # An explicitly offline request has no external billing or
+                    # side effects. Recover its orphaned reservation after a
+                    # restart, but never re-dispatch an ambiguous live request.
+                    if data.get("provider") != "demo" or request_key in self.server.active_draft_requests:
+                        raise APIError("This request already started. Check the inbox before starting another.",
+                                       409, code="draft_attempt_started")
             owner = next((a for a in item["crew"] if a["name"] == name), None)
             if owner is None:
                 raise APIError("Agent not found.", 404)
-            if len(item["drafts"]) >= MAX_DRAFTS:
+            reserved = db.execute("SELECT COUNT(*) FROM draft_requests WHERE office=? AND state='started' AND id!=?",
+                                  (ident, request_id)).fetchone()[0]
+            if len(item["drafts"]) + reserved >= MAX_DRAFTS:
                 raise APIError("Draft limit reached.", 409)
             instruction = owner["instruction"]
             if item["rules"]:
@@ -722,8 +732,9 @@ class Handler(BaseHTTPRequestHandler):
             except providers.ProviderError as exc:
                 raise APIError(str(exc), exc.status) from None
             if request_id:
-                db.execute("INSERT INTO draft_requests(office,id,fingerprint,state) VALUES (?,?,?,'started')",
+                db.execute("INSERT OR REPLACE INTO draft_requests(office,id,fingerprint,state) VALUES (?,?,?,'started')",
                            (ident, request_id, fingerprint))
+            self.server.active_draft_requests.add(request_key)
         # No database lock is held during a provider call. A crashed or ambiguous call must not be
         # automatically redispatched: most model endpoints do not promise exactly-once billing.
         try:
@@ -738,6 +749,12 @@ class Handler(BaseHTTPRequestHandler):
                 raise APIError("Provider returned an invalid or oversized draft.", 502)
             with store.connection(write=True) as db:
                 item = store.get(db, ident)
+                # Two local processes may safely recompute an offline orphan,
+                # but only the first result becomes a saved draft.
+                prior = db.execute("SELECT state FROM draft_requests WHERE office=? AND id=?",
+                                   request_key).fetchone()
+                if prior and prior[0] == "completed":
+                    return 200, item
                 if source:
                     source_file(db, ident, source["id"])  # Deleted while generating: do not save a new derived draft.
                 if len(item["drafts"]) >= MAX_DRAFTS:
@@ -753,10 +770,12 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             if request_id:
                 with store.connection(write=True) as db:
-                    db.execute("UPDATE draft_requests SET state='failed' WHERE office=? AND id=?", (ident, request_id))
+                    db.execute("UPDATE draft_requests SET state='failed' WHERE office=? AND id=? AND state='started'", (ident, request_id))
                 if isinstance(exc, APIError):
                     exc.code = "draft_attempt_failed"
             raise
+        finally:
+            self.server.active_draft_requests.discard(request_key)
         return 201, item
 
     def handle_request(self):
@@ -788,6 +807,7 @@ def create_server(port=8765, data_dir=None, room_file=None, room_port=0):
     """Construct a loopback server; port=0 is supported by in-process tests."""
     server = StudioServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
+    server.active_draft_requests = set()
     try:
         server.store = Store(data_dir if data_dir is not None else Path.home() / ".office-studio")
         room_file = room_file if room_file is not None else ROOT / "room" / "office.html"

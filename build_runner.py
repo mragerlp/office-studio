@@ -151,7 +151,7 @@ def smoke(target, archive):
                 raise RuntimeError("Public native ZIP must contain only the source allowlist and one runner, with no private room.")
             for entry in bundle.infolist():
                 native = entry.filename == "office-studio/office-studio-runner"
-                mode = 0o755 if entry.filename.endswith(".command") or native else 0o644
+                mode = 0o755 if entry.filename.endswith((".command", ".sh")) or native else 0o644
                 if entry.create_system != 3 or stat.S_IMODE(entry.external_attr >> 16) != mode:
                     raise RuntimeError("ZIP executable permissions were not preserved.")
             bundle.extractall(extracted)

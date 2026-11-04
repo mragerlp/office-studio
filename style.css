@@ -13,6 +13,7 @@
   --muted: #6c746d;
   --line: #dedfd5;
   --accent: #000000;
+  --idle-mark: var(--light-idle-mark, var(--accent));
   --accent-wash: #e8eeea;
   --shadow: 0 6px 28px #283d2910;
   --field-line: #d8dcd4;

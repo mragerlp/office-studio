@@ -434,7 +434,7 @@ class FileHandoffTests(unittest.TestCase):
         live_job = self.job(sample, agent="GUEST DESK", brief=brief, provider="openai",
                             model="fixture", shareFile=True)
         with patch.dict(os.environ, {"OPENAI_API_KEY": "synthetic", "OFFICE_OPENAI_MODEL": "fixture"}, clear=True), \
-             patch.object(providers, "_post", return_value={"output": [{"type": "message", "content": [
+             patch.object(providers, "_post", return_value={"status": "completed", "output": [{"type": "message", "content": [
                  {"type": "output_text", "text": "Mocked provider reply."}]}]}) as live:
             status, item = self.request("POST", self.a + "/drafts", live_job)
             self.assertEqual(status, 201, item)
@@ -519,7 +519,7 @@ class FileHandoffTests(unittest.TestCase):
         self.upload(self.b, "other office material")
         job = self.job(selected, provider="openai", model="model-fixture")
         with patch.dict(os.environ, {"OFFICE_OPENAI_MODEL": "model-fixture", "OPENAI_API_KEY": "synthetic"}, clear=True), \
-             patch.object(providers, "_post", return_value={"output": [{"type": "message", "content": [
+             patch.object(providers, "_post", return_value={"status": "completed", "output": [{"type": "message", "content": [
                  {"type": "output_text", "text": "Draft response."}]}]}) as call:
             for invalid in (job, {**job, "shareFile": "true"}, {**job, "shareFile": True, "model": ""},
                             {**job, "shareFile": True, "agent": "Missing"}):
@@ -555,7 +555,7 @@ class FileHandoffTests(unittest.TestCase):
             self.assertEqual(self.request("GET", self.a)[1]["drafts"], [])
             self.assertEqual(call.call_count, 1)
             call.side_effect = None
-            call.return_value = {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Retry result"}]}]}
+            call.return_value = {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Retry result"}]}]}
             status, item = self.request("POST", url, {**job, "requestId": str(uuid.uuid4())})
             self.assertEqual(status, 201, item)
             self.assertEqual(len(item["drafts"]), 1)
@@ -654,8 +654,8 @@ class RoutedDraftTests(unittest.TestCase):
                 for name, source, model in (("CRIMSON", "anthropic", "fixture-claude"), ("HOST", "openai", "fixture-alt")):
                     self.assertEqual(self.request("POST", base + "/agents/route", {"agent": name, "provider": source, "model": model})[0], 200)
                 responses = {
-                    "api.openai.com": {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Fictional draft"}]}]},
-                    "api.anthropic.com": {"content": [{"type": "text", "text": "Fictional draft"}]}}
+                    "api.openai.com": {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Fictional draft"}]}]},
+                    "api.anthropic.com": {"stop_reason": "end_turn", "content": [{"type": "text", "text": "Fictional draft"}]}}
                 with patch.object(providers, "_post", side_effect=lambda host, *args: responses[host]) as post:
                     for name, extra, source, model in (("CRIMSON", {}, "anthropic", "fixture-claude"),
                                                        ("HOST", {}, "openai", "fixture-alt"),
