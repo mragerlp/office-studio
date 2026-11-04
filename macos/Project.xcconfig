@@ -1,0 +1,3 @@
+// Local.xcconfig is private machine setup and excluded from Git.
+OFFICE_STUDIO_PYTHON = python3
+#include? "Local.xcconfig"

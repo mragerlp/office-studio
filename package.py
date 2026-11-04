@@ -12,14 +12,22 @@ FILES = (
     "package.py", "test_office.py", "test_providers.py", ".gitignore",
     "launch.py", "configure_providers.py", "loopback_server.py", "room_preview.py", "room_theme.js", "build_runner.py",
     "Start Office Studio.cmd", "Start Office Studio.command", "Configure Providers.cmd", "Configure Providers.command",
-    "test_launcher.py", "test_room_preview.py", "test_room_alert.py", "test_setup.py",
+    "Open Office Studio Online.cmd",
+    "test_launcher.py", "test_room_preview.py", "test_room_alert.py", "test_setup.py", "test_package.py",
+    "test_reconciliation_backend.py", "tests/idle-mark.cjs", "tests/frontend-reconciliation.cjs",
     "docs/setup.png", "docs/office-interior.png", "docs/boardroom.png",
+    "docs/CURRENT-STATE.md", "docs/research/2026-11-03-scaling/README.md",
+    "docs/research/2026-11-03-scaling/sources.md",
     "examples/friday-inquiry.txt",
     "assets/ampersand.svg", "assets/OFL-Old-Standard.txt",
     "room/office.html", "assets/three-r128.min.js", "assets/three-LICENSE.txt",
     "AGENTS.md", "MUSE.md", "GEMINI.md", "CLAUDE.md", "CODEX.md",
+    "macos/README.md", "macos/Project.xcconfig", "macos/build-runner.sh",
+    "macos/OfficeStudio/AppDelegate.swift", "macos/OfficeStudio.xcodeproj/project.pbxproj",
+    "macos/OfficeStudio.xcodeproj/xcshareddata/xcschemes/OfficeStudio.xcscheme",
+    "macos/tests/test_app.py", "script/build_and_run.sh",
     "packs/re.json", "packs/law.json", "packs/acct.json", "packs/fin.json", "packs/med.json",
-    "hosted/README.md", "hosted/index.html", "hosted/style.css", "hosted/auth.js", "hosted/app.js",
+    "hosted/README.md", "hosted/index.html", "hosted/get.html", "hosted/style.css", "hosted/auth.js", "hosted/app.js",
     "hosted/room-client.js", "hosted/room-view.js", "hosted/build_site.py",
     "hosted/tests/browser.mjs", "hosted/tests/auth.test.cjs", "hosted/tests/local_stack.py", "hosted/tests/postgres-fixture.sql",
     "supabase/config.toml", "supabase/migrations/20261103000100_office_studio_pilot.sql",
@@ -40,7 +48,7 @@ def add_file(bundle, source, name, *, executable=False):
 
 def build_package(output=None, runner=None, private_room=None):
     output = Path(output) if output is not None else ROOT / "dist" / "office-studio.zip"
-    sources = [(ROOT / name, name, name.endswith(".command")) for name in FILES]
+    sources = [(ROOT / name, name, name.endswith((".command", ".sh"))) for name in FILES]
     if runner is not None:
         runner = Path(runner)
         windows = runner.suffix.lower() == ".exe"

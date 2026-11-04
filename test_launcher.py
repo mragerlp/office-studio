@@ -32,6 +32,53 @@ class ReadyHandler(BaseHTTPRequestHandler):
 
 
 class LauncherTests(unittest.TestCase):
+    def test_online_opens_exact_configured_page_without_local_server(self):
+        url = "https://studio.example.invalid:8443/office/team/"
+        with patch.dict(os.environ, {"OFFICE_STUDIO_ONLINE_URL": url}, clear=True), \
+             patch.object(launch, "find_room") as local, \
+             patch.object(launch.webbrowser, "open", return_value=True) as browser:
+            self.assertEqual(launch.main(["--online"]), 0)
+            browser.assert_called_once_with(url, new=2)
+            local.assert_not_called()
+
+    def test_online_rejects_unsafe_or_missing_configuration_without_echo(self):
+        for url in ("", "http://studio.invalid/", "file:///private", "javascript:alert(1)", "//studio.invalid",
+                    "https://private:private@studio.invalid/", "https://studio.invalid/office/?code=private",
+                    "https://studio.invalid/#access_token=private", "https://studio.invalid\\@elsewhere.invalid/",
+                    "https://studio.invalid/\nprivate", "https://%65xample.invalid/", "https://studio.invalid:65536/",
+                    "https://[private/", "https:///private"):
+            output = io.StringIO()
+            with self.subTest(url=url), patch.dict(os.environ, {"OFFICE_STUDIO_ONLINE_URL": url}, clear=True), \
+                 patch.object(launch.webbrowser, "open") as browser, patch("sys.stderr", new=output):
+                self.assertEqual(launch.main(["--online"]), 1)
+                self.assertIn("OFFICE_STUDIO_ONLINE_URL", output.getvalue())
+                self.assertNotIn("private", output.getvalue())
+                browser.assert_not_called()
+
+    def test_online_browser_failure_and_cancel_return_an_actionable_error(self):
+        for outcome, message in ((False, "Open the configured"), (OSError("private"), "Open the configured"),
+                                 (KeyboardInterrupt(), "cancelled")):
+            output = io.StringIO()
+            with self.subTest(message=message), patch.dict(os.environ, {"OFFICE_STUDIO_ONLINE_URL": "https://studio.invalid"}), \
+                 patch.object(launch.webbrowser, "open", side_effect=[outcome]), patch("sys.stderr", new=output):
+                self.assertEqual(launch.main(["--online"]), 1)
+                self.assertIn(message, output.getvalue())
+                self.assertNotIn("private", output.getvalue())
+
+    @unittest.skipUnless(os.name == "nt", "Windows double-click wrapper")
+    def test_online_wrapper_with_no_configuration_explains_setup(self):
+        with tempfile.TemporaryDirectory(prefix="Office Studio Online ") as temporary:
+            folder = Path(temporary)
+            for name in ("launch.py", "Start Office Studio.cmd", "Open Office Studio Online.cmd"):
+                shutil.copyfile(launch.ROOT / name, folder / name)
+            # Keep any real operator configuration and browser out of this source-package test.
+            environment = {name: os.environ[name] for name in ("PATH", "SystemRoot", "COMSPEC")}
+            environment.update(TEMP=temporary, TMP=temporary, USERPROFILE=temporary)
+            result = subprocess.run([os.environ["COMSPEC"], "/d", "/c", "Open Office Studio Online.cmd"],
+                                    cwd=folder, env=environment, input="\n", capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("OFFICE_STUDIO_ONLINE_URL", result.stderr)
+
     @unittest.skipUnless(os.name == "nt", "Windows double-click wrapper")
     def test_windows_wrapper_finds_python_in_a_folder_with_spaces(self):
         with tempfile.TemporaryDirectory(prefix="Office Studio launcher ") as temporary:

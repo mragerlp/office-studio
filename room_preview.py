@@ -68,7 +68,7 @@ def systems(value):
 
 
 def renderer_pack(workspace):
-    """Adapt valid saved crews to the room, preserving rows and gate owners.
+    """Adapt valid saved crews to the room, preserving roster rows.
 
     Empty or malformed legacy crews return None so Studio keeps its 2D view;
     no invented desk or persisted migration is needed to display an old office.
@@ -107,7 +107,6 @@ def renderer_pack(workspace):
     gates = workspace.get("gates", [])
     if not isinstance(gates, list) or len(gates) > 40:
         return None
-    approvals = []
     for gate in gates:
         if not isinstance(gate, dict) or not isinstance(gate.get("owner"), str) or gate["owner"] not in names:
             return None
@@ -115,12 +114,11 @@ def renderer_pack(workspace):
         brief = gate.get("brief", {})
         if not need or not isinstance(brief, dict):
             return None
-        approvals.append({"owner": names[gate["owner"]], "need": need, "brief": {
-            "action": clean_text(brief.get("action"), 2000) or "Review this prepared item. No external action is performed.",
-            "ifDecline": clean_text(brief.get("ifDecline"), 2000) or "Keep this item held for owner review."}})
+    # The room turns each gate into an actionable approval at boot. Standing
+    # rules remain in the saved office policy; decisions belong to saved drafts.
     return {"office": title, "feed": "simulated", "rules": clean_text(workspace.get("rules"), 8000) or
             "Simulated room only. Prepare drafts for owner review; perform no external actions.",
-            "systems": sources, "crew": exported, "gates": approvals}
+            "systems": sources, "crew": exported, "gates": []}
 
 
 class PreviewHandler(BaseHTTPRequestHandler):
@@ -266,7 +264,7 @@ class RoomPreview:
             agents.append({"agent": key_name, "title": clean_text(appearance.get("title"), 60) or default_title,
                            "color": color, "executive": chief})
         presentation = {"name": workspace["name"], "color": brand_color, "logo": checked_logo, "agents": agents,
-                        "studioOrigin": f"http://{hostname}:{self.studio_port}"}
+                        "studioOrigin": f"http://{hostname}:{self.studio_port}", "deskHistory": True}
         encoded = json.dumps(presentation, ensure_ascii=True, allow_nan=False)
         for character, escape in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
             encoded = encoded.replace(character, escape)

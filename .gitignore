@@ -8,3 +8,6 @@ private-room.html
 *.sqlite3*
 .DS_Store
 ._*
+macos/Local.xcconfig
+macos/DerivedData/
+**/xcuserdata/

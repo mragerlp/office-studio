@@ -386,6 +386,64 @@ class FileHandoffTests(unittest.TestCase):
         return {"fileId": file["id"], "fileVersion": file["version"], "requestId": str(uuid.uuid4()),
                 "provider": "demo", "model": "", "agent": "CRIMSON", "brief": "Draft a welcome.", **extras}
 
+    def test_offline_friday_guest_reply_and_generic_fallback(self):
+        import providers
+        guest = {"name": "GUEST DESK", "specialty": "Guest communications", "instruction": "Draft guest replies."}
+        self.assertEqual(self.request("POST", self.a + "/agents", guest)[0], 200)
+        example = (ROOT / "examples/friday-inquiry.txt").read_text(encoding="utf-8")
+        sample = self.upload(self.a, example, "friday-inquiry.txt")
+        other = self.upload(self.a, "A different fictional guest's private note.", "friday-inquiry.txt")
+        brief = "Draft a Friday visit reply asking what time works. Leave availability unconfirmed."
+        with patch.object(providers, "_post") as live:
+            for request in (brief, "Draft a reply asking what time works. Leave availability unconfirmed.",
+                            "Draft a short reply asking for a preferred time. Keep availability unconfirmed.",
+                            "Please write back to the guest and ask what time on Friday suits them.",
+                            "Ask the guest when they would like to come by.",
+                            "Could you ask the visitor when they’d like to stop by on Friday?"):
+                job = self.job(sample, agent="GUEST DESK", brief=request)
+                status, item = self.request("POST", self.a + "/drafts", job)
+                self.assertEqual(status, 201, item)
+                draft = item["drafts"][-1]
+                self.assertEqual((draft["agent"], draft["provider"], draft["model"], draft["source"], draft["status"]),
+                                 ("GUEST DESK", "demo", "", sample, "pending"))
+                reply = draft["text"]
+                self.assertIn("What time on Friday afternoon would work for you?", reply)
+                self.assertIn("check availability", reply)
+                self.assertNotIn("Requested work", reply)
+                self.assertNotIn(example.strip(), reply)
+                self.assertNotIn(request, reply)
+                path = self.a + "/drafts/" + draft["id"]
+                self.assertEqual(self.request("POST", path + "/decision", {"decision": "approved"})[0], 200)
+                self.assertEqual(self.request("GET", path + "/download"), (200, reply))
+
+            for job in (self.job(other, agent="GUEST DESK", brief=brief), self.job(sample, brief=brief),
+                        self.job(sample, agent="GUEST DESK", brief="Decline the Friday visit."),
+                        self.job(sample, agent="GUEST DESK", brief="Summarize when the guest would like to come by."),
+                        self.job(sample, agent="GUEST DESK", brief="Do not ask the guest what time works."),
+                        self.job(sample, agent="GUEST DESK", brief="Ask what time works and confirm the booking."),
+                        self.job(sample, agent="GUEST DESK", brief="Ask what time works for a Monday visit."),
+                        self.job(sample, agent="GUEST DESK", brief="Ask what time the kitchen closes."),
+                        {"provider": "demo", "agent": "GUEST DESK", "brief": brief}):
+                status, item = self.request("POST", self.a + "/drafts", job)
+                self.assertEqual(status, 201, item)
+                reply = item["drafts"][-1]["text"]
+                self.assertIn("Requested work: " + job["brief"], reply)
+                self.assertNotIn("Friday afternoon would work for you?", reply)
+            live.assert_not_called()
+
+        live_job = self.job(sample, agent="GUEST DESK", brief=brief, provider="openai",
+                            model="fixture", shareFile=True)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "synthetic", "OFFICE_OPENAI_MODEL": "fixture"}, clear=True), \
+             patch.object(providers, "_post", return_value={"status": "completed", "output": [{"type": "message", "content": [
+                 {"type": "output_text", "text": "Mocked provider reply."}]}]}) as live:
+            status, item = self.request("POST", self.a + "/drafts", live_job)
+            self.assertEqual(status, 201, item)
+            draft = item["drafts"][-1]
+            self.assertEqual((draft["text"], draft["agent"], draft["provider"], draft["model"], draft["source"]),
+                             ("Mocked provider reply.", "GUEST DESK", "openai", "fixture", sample))
+            live.assert_called_once()
+            self.assertIn(example, live.call_args.args[3]["input"])
+
     def test_scoped_originals_approval_and_download(self):
         import providers
         original = "\ufeffA fictional Friday inquiry.\r\nA second line.\n"
@@ -461,7 +519,7 @@ class FileHandoffTests(unittest.TestCase):
         self.upload(self.b, "other office material")
         job = self.job(selected, provider="openai", model="model-fixture")
         with patch.dict(os.environ, {"OFFICE_OPENAI_MODEL": "model-fixture", "OPENAI_API_KEY": "synthetic"}, clear=True), \
-             patch.object(providers, "_post", return_value={"output": [{"type": "message", "content": [
+             patch.object(providers, "_post", return_value={"status": "completed", "output": [{"type": "message", "content": [
                  {"type": "output_text", "text": "Draft response."}]}]}) as call:
             for invalid in (job, {**job, "shareFile": "true"}, {**job, "shareFile": True, "model": ""},
                             {**job, "shareFile": True, "agent": "Missing"}):
@@ -497,7 +555,7 @@ class FileHandoffTests(unittest.TestCase):
             self.assertEqual(self.request("GET", self.a)[1]["drafts"], [])
             self.assertEqual(call.call_count, 1)
             call.side_effect = None
-            call.return_value = {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Retry result"}]}]}
+            call.return_value = {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Retry result"}]}]}
             status, item = self.request("POST", url, {**job, "requestId": str(uuid.uuid4())})
             self.assertEqual(status, 201, item)
             self.assertEqual(len(item["drafts"]), 1)
@@ -596,8 +654,8 @@ class RoutedDraftTests(unittest.TestCase):
                 for name, source, model in (("CRIMSON", "anthropic", "fixture-claude"), ("HOST", "openai", "fixture-alt")):
                     self.assertEqual(self.request("POST", base + "/agents/route", {"agent": name, "provider": source, "model": model})[0], 200)
                 responses = {
-                    "api.openai.com": {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Fictional draft"}]}]},
-                    "api.anthropic.com": {"content": [{"type": "text", "text": "Fictional draft"}]}}
+                    "api.openai.com": {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": "Fictional draft"}]}]},
+                    "api.anthropic.com": {"stop_reason": "end_turn", "content": [{"type": "text", "text": "Fictional draft"}]}}
                 with patch.object(providers, "_post", side_effect=lambda host, *args: responses[host]) as post:
                     for name, extra, source, model in (("CRIMSON", {}, "anthropic", "fixture-claude"),
                                                        ("HOST", {}, "openai", "fixture-alt"),

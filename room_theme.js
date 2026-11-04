@@ -16,16 +16,20 @@
   const executiveAliases = new Set([...suppliedAgents.values()]
     .filter(item => executiveInfo ? item.executive === true : item.agent === "CRIMSON")
     .map(item => item.agent));
-  const executiveIds = new Set(executiveInfo ? [] : ["crimson"]);
   const knownIds = new Map();
   let office, attempts = 0, queued = false, ownerReviewPending = false, ownerExecutivePending = false,
     reviewSculpture = null, refreshSculptureAlert = null;
-
-  function nativeExecutiveGate() {
-    const state = office && office.OFFICE_STATE;
-    // Seeded simulated gates are still visible approvals for the executive.
-    // Display titles/statuses are presentation and are not ownership sensors.
-    return Array.isArray(state?.approvals) && state.approvals.find(gate => executiveIds.has(gate.agentId));
+  function reportRoomState(status) {
+    if (window.parent !== window)
+      window.parent.postMessage({type: "office-studio:room-state", status}, presentation.studioOrigin);
+  }
+  function waitForFirstFrame(count = 0) {
+    const renderer = office?.renderer;
+    if (renderer?.info?.render?.frame > 0 && !renderer.getContext().isContextLost()) {
+      reportRoomState("ready");
+      renderer.domElement.addEventListener("webglcontextlost", () => reportRoomState("failed"), {once: true});
+    } else if (count < 300) setTimeout(() => waitForFirstFrame(count + 1), 100);
+    else reportRoomState("failed");
   }
 
   function markReviewSignal() {
@@ -37,7 +41,7 @@
     if (refreshSculptureAlert) refreshSculptureAlert();
   }
 
-  // Accept only the Studio parent's appearance, review flags and open-alert action.
+  // The Studio parent owns saved decisions; room simulation is display only.
   // The old two-key review signal still indicates generic attention.
   if (window.parent !== window && typeof window.addEventListener === "function") {
     window.addEventListener("message", event => {
@@ -49,16 +53,6 @@
           (data.mode === "light" || data.mode === "dark")) {
         document.documentElement.dataset.appearance = data.mode;
         if (typeof updateStudioExposure === "function") updateStudioExposure();
-        return;
-      }
-      if (keys.length === 1 && data.type === "office-studio:open-executive-alert") {
-        const gate = nativeExecutiveGate();
-        if (gate && typeof office.UI.select === "function") {
-          if (document.getElementById("board")?.hidden === false) office.UI.toggleBoard(false);
-          office.UI.select(gate.agentId);
-          const panel = document.getElementById("panel");
-          if (panel) { panel.tabIndex = -1; panel.focus({preventScroll: true}); }
-        }
         return;
       }
       const legacy = keys.length === 2 && keys.includes("type") && keys.includes("pending");
@@ -88,7 +82,6 @@
     // Do not change the display name here: the room still builds its gate
     // owner-name lookup immediately after publishing each add event.
     knownIds.set(supplied.agent, person.id);
-    if (executiveAliases.has(supplied.agent)) executiveIds.add(person.id);
     choices.set(person.id, choice);
     return choice;
   }
@@ -97,7 +90,6 @@
   // pack. Install once now, so Figure receives the owner's paint at birth.
   if (window.AgentOffice && typeof window.AgentOffice.on === "function") {
     window.AgentOffice.on("add", preparePaint);
-    window.AgentOffice.on("approval", markReviewSignal);
   }
 
   function logoImage(marker, label) {
@@ -169,7 +161,7 @@
         !office.THREE || typeof office.THREE.Color !== "function") return;
     const base = sculpture.base;
     if (!(base.r + base.g + base.b > 0) || typeof base.copy !== "function") return;
-    let painted = "", executiveAlert = false, reportedNative;
+    let painted = "";
     const gains = new Map();
     function paint(hex) {
       if (painted === hex) return;
@@ -196,44 +188,23 @@
       document.documentElement.dataset.officeAmpColor = hex;
     }
     refreshSculptureAlert = () => {
-      const native = !!nativeExecutiveGate();
-      if (native !== reportedNative && window.parent !== window) {
-        // Report only the native flag. Echoing the combined flag would latch
-        // a saved draft's alert after the owner cleared it in the Studio.
-        window.parent.postMessage({type: "office-studio:room-executive-alert", pending: native}, presentation.studioOrigin);
-        reportedNative = native;
-      }
-      const executive = native || ownerExecutivePending;
-      executiveAlert = executive;
-      sculpture.group.userData.officeStudioNativeExecutivePending = native;
-      sculpture.group.userData.officeStudioExecutiveAlert = executive;
-      document.documentElement.dataset.officeNativeExecutivePending = String(native);
-      document.documentElement.dataset.officeExecutiveAlert = String(executive);
-      paint(executive ? "#a70008" : presentation.color);
-      return executive;
+      sculpture.group.userData.officeStudioExecutiveAlert = ownerExecutivePending;
+      document.documentElement.dataset.officeExecutiveAlert = String(ownerExecutivePending);
+      paint(ownerExecutivePending ? "#a70008" : presentation.color);
     };
     sculpture.group.userData.officeStudioAmpBrandColor = presentation.color;
     document.documentElement.dataset.officeAmpBrandColor = presentation.color;
-    // The native loop remains the sole clock, including reduced-motion rules.
-    // Its writes retain realIssues. Reads combine that result with actual
-    // executive approvals and the parent's saved-review flags, without gates.
+    // Keep the native animation clock and reduced-motion handling. Its
+    // simulation writes cannot change the host's saved executive decision.
     const fast = Object.getOwnPropertyDescriptor(sculpture, "fast");
     if (!fast || fast.configurable) {
-      let nativeFast = Boolean(sculpture.fast);
-      sculpture.group.userData.officeStudioNativeFast = nativeFast;
       Object.defineProperty(sculpture, "fast", {configurable: true, enumerable: true,
-        get: () => nativeFast || ownerReviewPending || executiveAlert,
-        set: value => {
-          nativeFast = Boolean(value);
-          sculpture.group.userData.officeStudioNativeFast = nativeFast;
-          refreshSculptureAlert();
-        }});
-      reviewSculpture = sculpture;
-      markReviewSignal();
+        get: () => ownerExecutivePending, set() {}});
     }
-    sculpture.group.userData.officeStudioAmpSource = "native-real-issues-or-owner-review";
-    document.documentElement.dataset.officeAmpSource = "native-real-issues-or-owner-review";
-    refreshSculptureAlert();
+    reviewSculpture = sculpture;
+    sculpture.group.userData.officeStudioAmpSource = "saved-executive-review";
+    document.documentElement.dataset.officeAmpSource = "saved-executive-review";
+    markReviewSignal();
   }
 
   function start() {
@@ -241,7 +212,10 @@
     if (!office || !office.UI || !office.OFFICE_STATE || !document.querySelector("#topbar .brand") ||
         typeof AGENT_COLORS !== "object") {
       if (++attempts < 300) setTimeout(start, 100);
-      else document.documentElement.dataset.officeTheme = "unsupported";
+      else {
+        document.documentElement.dataset.officeTheme = "unsupported";
+        reportRoomState("failed");
+      }
       return;
     }
     const state = office.OFFICE_STATE;
@@ -286,6 +260,14 @@
     tintExistingAmpersand();
     if (window.parent !== window) {
       const notifyStudio = type => window.parent.postMessage({type}, presentation.studioOrigin);
+      if (presentation.deskHistory === true) {
+        office.UI.openDelivered = id => {
+          const key = choices.get(id)?.agent;
+          // Presentation rows follow the saved roster, even when a display title or renderer alias differs.
+          const seat = presentation.agents.findIndex(row => row.agent === key);
+          if (seat >= 0) window.parent.postMessage({type: "office-studio:open-delivered", seat}, presentation.studioOrigin);
+        };
+      }
       if (typeof office.UI.openManual === "function") {
         office.UI.openManual = () => notifyStudio("office-studio:open-manual");
       }
@@ -295,6 +277,7 @@
     }
     document.title = presentation.name + " · Office Suite";
     document.documentElement.dataset.officeTheme = "ready";
+    waitForFirstFrame();
     new MutationObserver(schedule).observe(document.body, {childList: true, subtree: true, characterData: true});
     decorate();
   }

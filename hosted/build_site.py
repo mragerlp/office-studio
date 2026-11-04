@@ -51,11 +51,21 @@ def build_room():
     return page
 
 
-def build(output, config):
+def download_link(url, label):
+    if not url:
+        return "<small>Download not yet published.</small>"
+    target = urlsplit(url)
+    if (target.scheme != "https" or not re.fullmatch(r"[a-zA-Z0-9.-]+(:[0-9]{1,5})?", target.netloc)
+            or target.query or target.fragment or "\\" in url or any(ord(c) < 33 for c in url)):
+        raise ValueError("Use a permanent public HTTPS download URL without a query or fragment.")
+    return f'<a href="{html.escape(url, quote=True)}">{label}</a>'
+
+
+def build(output, config, *, macos_download="", windows_download=""):
     if output.resolve() in (ROOT, HERE):
         raise ValueError("Choose a separate output directory.")
     output.mkdir(parents=True, exist_ok=True)
-    expected = {"index.html", "style.css", "auth.js", "app.js", "room-view.js", "appearance.js",
+    expected = {"index.html", "get.html", "style.css", "auth.js", "app.js", "room-view.js", "appearance.js",
                 "ampersand.svg", "config.js", "suite-room.html", "three-LICENSE.txt", "OFL-Old-Standard.txt"}
     if any(path.name not in expected or not path.is_file() or path.is_symlink() for path in output.iterdir()):
         raise ValueError("Use an empty directory or an earlier Office Studio hosted build.")
@@ -63,6 +73,10 @@ def build(output, config):
               + config["url"] + "; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'")
     page = (HERE / "index.html").read_text(encoding="utf-8")
     page = replace_once(page,"<head>",'<head><meta http-equiv="Content-Security-Policy" content="' + html.escape(policy) + '">')
+    downloads = (HERE / "get.html").read_text(encoding="utf-8")
+    downloads = replace_once(downloads, "<!-- macos-download -->", download_link(macos_download, "Download for macOS"))
+    downloads = replace_once(downloads, "<!-- windows-download -->", download_link(windows_download, "Download for Windows"))
+    (output / "get.html").write_text(downloads, encoding="utf-8")
     (output / "index.html").write_text(page,encoding="utf-8")
     for name in ("style.css","auth.js","app.js","room-view.js"):
         copyfile(HERE / name,output / name)
@@ -77,5 +91,10 @@ def build(output, config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "dist/hosted")
+    parser.add_argument("--macos-download", default="", help="Permanent public HTTPS macOS release URL")
+    parser.add_argument("--windows-download", default="", help="Permanent public HTTPS Windows release URL")
+    parser.add_argument("--enable-chatgpt-sign-in", action="store_true", help="Expose the registered and approved custom:chatgpt provider")
     args = parser.parse_args()
-    build(args.output, public_config(os.environ.get("SUPABASE_URL",""), os.environ.get("SUPABASE_PUBLISHABLE_KEY","")))
+    config = public_config(os.environ.get("SUPABASE_URL",""), os.environ.get("SUPABASE_PUBLISHABLE_KEY",""))
+    config["chatgptSignIn"] = args.enable_chatgpt_sign_in
+    build(args.output, config, macos_download=args.macos_download, windows_download=args.windows_download)

@@ -583,7 +583,7 @@
                   <span id="preview-status" class="state-pill"></span
                   ><span id="preview-provider" class="field-note"></span>
                 </div>
-                <h3 id="preview-brief"></h3>
+                <h3 id="preview-brief" tabindex="-1"></h3>
                 <p id="preview-agent" class="field-note"></p>
                 <p id="preview-source" class="field-note" hidden></p>
                 <pre id="preview-text"></pre>
@@ -610,6 +610,13 @@
         </div>
       </section>
     </main>
+    <dialog id="desk-history" class="paper manual-dialog" aria-labelledby="desk-history-title">
+      <p class="eyebrow">DELIVERED</p>
+      <h2 id="desk-history-title"></h2>
+      <p class="review-description">Select an approved draft to open its saved decision in the inbox.</p>
+      <div id="desk-history-list" class="draft-list"></div>
+      <form method="dialog" class="button-row"><button class="button quiet">Back to room</button></form>
+    </dialog>
     <dialog
       id="field-manual"
       class="paper manual-dialog"
